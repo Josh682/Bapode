@@ -1,0 +1,40 @@
+# BACKLOG.md — Pelacak Eksekusi Fitur Posture Guardian
+
+> **Cara Penggunaan oleh Agen:** Periksa daftar di bawah ini sebelum memulai sesi kerja. Ubah tanda `[ ]` menjadi `[~]` saat fitur sedang dikerjakan, dan `[x]` setelah seluruh *unit test* serta *typecheck* lulus.
+
+## Fase 1: Fondasi Database & Arsitektur State
+- [x] **M1.1 — Inisialisasi Skema SQLite WAL (`src/db/schema.sql` & `src/db/manager.py`)**
+  - Referensi: `docs/specs/04-telemetry-and-schema.md`, `docs/ARCHITECTURE.md`
+  - Buat skema 4 tabel (`calibration_profiles`, `monitoring_sessions`, `posture_state_intervals`, `session_telemetry_buckets`) dan *worker thread* penyimpanan asinkron.
+- [x] **M1.2 — Definisi Enum & State Machine 3-Sumbu (`src/tracker/states.py`)**
+  - Referensi: `docs/ARCHITECTURE.md`
+  - Implementasikan sumbu ortogonal `OperatingMode`, `VisibilityState`, dan `UIIntrusivenessLevel`.
+
+## Fase 2: Pipeline Sinyal, Tracker, & Kalibrasi (Tanpa Kamera/GUI)
+- [x] **M2.1 — Ekstraktor 5 Metrik Geometris Murni (`src/vision/metrics.py`)**
+  - Referensi: `docs/specs/01-vision-and-metrics.md`
+  - Implementasikan fungsi matematis untuk `HEAD_FORWARD_SCALE`, `TORSO_NECK_COMPRESSION`, `SHOULDER_VERTICAL_DROP`, `GAZE_DOWN_PITCH`, dan `CORONAL_ASYMMETRY` beserta gerbang *yaw* ($|\text{yaw}_{\text{head}}| \gt 15^\circ$).
+- [x] **M2.2 — Filter Sinyal & `IssueTracker` (`src/tracker/issue_tracker.py`)**
+  - Referensi: `docs/specs/02-signal-and-tracker.md`
+  - Implementasikan *Sliding Median-3*, *Asymmetric EMA* sadar-$\Delta t$, *Normalized Velocity Detector*, *One-Way Velocity Gate* (`freeze_max_s = 3.0`), *Step-Down Floor* (`d_floor = 9.0`), serta *UI Cooldown & Micro-break Escalation*.
+- [ ] **M2.3 — Modul Kalibrasi, MAD Noise Floor, & Setup Drift (`src/tracker/calibration.py`)**
+  - Referensi: `docs/specs/03-calibration-and-drift.md`
+  - Implementasikan *Plausibility Gate* 15 sampel, *Running Quiet-Period Noise Floor*, dan detektor pergeseran posisi kursi/engsel layar ($\ge 10\text{ detik}$).
+
+## Fase 3: Akuisisi Kamera & Fusi MediaPipe
+- [ ] **M3.1 — Single-Reader Camera Thread 5 FPS (`src/camera/reader.py`)**
+  - Referensi: `docs/specs/01-vision-and-metrics.md`, `docs/ARCHITECTURE.md`
+  - Implementasikan pembacaan kamera $\Delta t \approx 200\text{ ms}$ dengan *monotonic timestamp* dan *latest-frame queue* berukuran $1$.
+- [ ] **M3.2 — Sequential Pose + Face Engine & Multi-Person Association (`src/vision/detector.py`)**
+  - Referensi: `docs/specs/01-vision-and-metrics.md`
+  - Integrasikan `MediaPipe Pose Landmarker (Lite)` dan `MediaPipe Face Landmarker` beserta verifikasi jarak Euclidean hidung ke pusat wajah ($\lt 0.25 \cdot W_{\text{sh}}$).
+
+## Fase 4: Antarmuka Desktop & Integrasi OS
+- [ ] **M4.1 — Non-Activating & Screen-Share Safe HUD Overlay (`src/ui/overlay.py`)**
+  - Referensi: `docs/DESIGN_SYSTEM.md`, `docs/ARCHITECTURE.md`
+  - Implementasikan jendela *overlay* tembus klik, anti-curi fokus, dan tersembunyi dari tangkapan layar rapat (`WDA_EXCLUDEFROMCAPTURE` / `NSWindowSharingNone`).
+- [ ] **M4.2 — System Tray, Quick Snooze, & OS Power Events (`src/ui/tray.py`)**
+  - Referensi: `docs/DESIGN_SYSTEM.md`, `docs/ARCHITECTURE.md`
+  - Implementasikan menu *System Tray*, tombol *Snooze* ($15/30/60\text{ menit}$), dan *hook* *flush* database saat *sleep/wake*.
+- [ ] **M4.3 — Jendela Kalibrasi Terpandu & Dashboard Tren (`src/ui/dashboard.py`)**
+  - Referensi: `docs/DESIGN_SYSTEM.md`, `docs/specs/04-telemetry-and-schema.md`
