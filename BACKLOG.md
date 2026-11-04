@@ -17,9 +17,9 @@
 - [x] **M2.2 — Filter Sinyal & `IssueTracker` (`src/tracker/issue_tracker.py`)**
   - Referensi: `docs/specs/02-signal-and-tracker.md`
   - Implementasikan *Sliding Median-3*, *Asymmetric EMA* sadar-$\Delta t$, *Normalized Velocity Detector*, *One-Way Velocity Gate* (`freeze_max_s = 3.0`), *Step-Down Floor* (`d_floor = 9.0`), serta *UI Cooldown & Micro-break Escalation*.
-- [ ] **M2.3 — Modul Kalibrasi, MAD Noise Floor, & Setup Drift (`src/tracker/calibration.py`)**
-  - Referensi: `docs/specs/03-calibration-and-drift.md`
-  - Implementasikan *Plausibility Gate* 15 sampel, *Running Quiet-Period Noise Floor*, dan detektor pergeseran posisi kursi/engsel layar ($\ge 10\text{ detik}$).
+- [x] **M2.3 — Modul Kalibrasi, MAD Noise Floor, Setup Drift, & Telemetri Bebas Dilusi (`src/tracker/calibration.py` & `src/tracker/telemetry.py`)**
+  - Referensi: `docs/specs/03-calibration-and-drift.md`, `docs/specs/04-telemetry-and-schema.md`
+  - Implementasikan *Plausibility Gate* 15 sampel, *Running Quiet-Period Noise Floor*, detektor setup drift ($\ge 10\text{ detik}$), RLE interval manager, agregator *bucket* 5 menit bebas dilusi (`mean_violating_*`, `p95_*`), dan batas kepatuhan sesi.
 
 ## Fase 3: Akuisisi Kamera & Fusi MediaPipe
 - [ ] **M3.1 — Single-Reader Camera Thread 5 FPS (`src/camera/reader.py`)**

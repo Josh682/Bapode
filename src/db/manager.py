@@ -411,7 +411,7 @@ class DatabaseManager:
             return
 
         # Signature changed: flush existing interval
-        self.flush_current_interval(current_time)
+        self.flush_current_interval(current_time, alert_dismissal_sec=alert_dismissal_sec)
 
         # Start new interval
         self._start_new_interval(
@@ -419,7 +419,7 @@ class DatabaseManager:
             profile_id=profile_id,
             signature=signature,
             start_time=current_time,
-            alert_dismissal_sec=alert_dismissal_sec,
+            alert_dismissal_sec=None,
         )
 
     def _start_new_interval(
@@ -496,7 +496,11 @@ class DatabaseManager:
         with self.transaction() as cursor:
             cursor.execute(query, params)
 
-    def flush_current_interval(self, flush_time: datetime | None = None) -> None:
+    def flush_current_interval(
+        self,
+        flush_time: datetime | None = None,
+        alert_dismissal_sec: float | None = None,
+    ) -> None:
         """Flush and commit the active interval if one exists."""
         if (
             self._current_interval_id is not None
@@ -508,6 +512,7 @@ class DatabaseManager:
                 self._current_interval_id,
                 end_t.strftime("%Y-%m-%d %H:%M:%S"),
                 duration,
+                alert_dismissal_sec,
             )
             # Reset active tracking state
             self._current_interval_id = None
