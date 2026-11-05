@@ -49,6 +49,7 @@ class VisionTrackerWorker(QtCore.QThread):
     calibration_completed = QtCore.Signal(object)  # CalibrationProfileRecord
     drift_detected = QtCore.Signal(str)  # drift description
     snooze_status_changed = QtCore.Signal(bool, float)  # is_snoozed, remaining_s
+    live_telemetry = QtCore.Signal(dict)  # Live telemetry for threshold tuning
 
     def __init__(
         self,
@@ -262,8 +263,9 @@ class VisionTrackerWorker(QtCore.QThread):
             )
 
             is_moving = False
+            v_norm = 0.0
             if has_shoulders and pose_data is not None:
-                _, is_moving = self.velocity_detector.update(
+                v_norm, is_moving = self.velocity_detector.update(
                     pose_data.shoulder_midpoint.x,
                     pose_data.shoulder_midpoint.y,
                     pose_data.shoulder_width,
@@ -299,6 +301,38 @@ class VisionTrackerWorker(QtCore.QThread):
                     pose_data, primary_face, self.orchestrator.ref, dt=dt
                 )
                 self.metrics_calculated.emit(metrics, current_mono)
+
+            # Emit live telemetry for calibration and empirical tuning (Bab 8)
+            d_hats: dict[str, float] = {}
+            buckets: dict[str, float] = {}
+            if snapshot.tracker_states:
+                d_hats = {k: st.filtered_deviation for k, st in snapshot.tracker_states.items()}
+                buckets = {k: st.bucket_s for k, st in snapshot.tracker_states.items()}
+
+            telemetry_data = {
+                "timestamp": current_mono,
+                "vis_state": snapshot.visibility_state.value,
+                "op_mode": snapshot.operating_mode.value,
+                "ui_level": snapshot.ui_level.value,
+                "is_moving": is_moving,
+                "v_norm": v_norm,
+                "d_hat": d_hats,
+                "sigmas": dict(self.orchestrator.noise_adapter.current_sigmas),
+                "tau_enter": dict(self.orchestrator.noise_adapter.effective_thresholds),
+                "tau_exit": {
+                    k: tracker.tau_exit
+                    for k, tracker in self.orchestrator.escalation_controller.trackers.items()
+                },
+                "violations": {
+                    "fhp": snapshot.violation_flags.v_fhp,
+                    "neck": snapshot.violation_flags.v_neck_comp,
+                    "slump": snapshot.violation_flags.v_slump,
+                    "pitch": snapshot.violation_flags.v_gaze_pitch,
+                    "tilt": snapshot.violation_flags.v_tilt,
+                },
+                "buckets": buckets,
+            }
+            self.live_telemetry.emit(telemetry_data)
 
             # Check Alert and Microbreak triggers
             if snapshot.ui_level == UIIntrusivenessLevel.ACTIVE_OVERLAY:

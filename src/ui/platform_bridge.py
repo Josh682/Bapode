@@ -28,8 +28,8 @@ def set_screen_share_protected(widget: QtWidgets.QWidget) -> bool:
     if sys.platform == "darwin":
         try:
             # PyObjC AppKit integration
-            import objc  # type: ignore[import-not-found]
-            from AppKit import (  # type: ignore[import-not-found]
+            import objc
+            from AppKit import (
                 NSWindowCollectionBehaviorCanJoinAllSpaces,
                 NSWindowCollectionBehaviorFullScreenAuxiliary,
                 NSWindowCollectionBehaviorIgnoresCycle,

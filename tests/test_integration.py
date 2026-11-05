@@ -9,8 +9,13 @@ Verifies:
 5. Full end-to-end pipeline (Camera -> Vision -> DB) and graceful shutdown without deadlock.
 """
 
+import os
 import time
 from pathlib import Path
+
+# Ensure offscreen Qt platform and writable matplotlib cache for test execution
+os.environ["QT_QPA_PLATFORM"] = "offscreen"
+os.environ.setdefault("MPLCONFIGDIR", "/tmp/matplotlib")
 
 import pytest
 from PySide6 import QtCore, QtWidgets
@@ -32,10 +37,10 @@ from ui.tray import SystemTrayManager
 
 @pytest.fixture(scope="session")
 def qapp() -> QtWidgets.QApplication:
-    """Ensure QApplication instance exists for GUI tests."""
+    """Ensure QApplication instance exists with offscreen platform for GUI tests."""
     app = QtWidgets.QApplication.instance()
     if app is None:
-        app = QtWidgets.QApplication([])
+        app = QtWidgets.QApplication(["-platform", "offscreen"])
     return app  # type: ignore[return-value]
 
 

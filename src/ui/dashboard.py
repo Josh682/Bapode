@@ -10,6 +10,8 @@ Implements:
 3. Guided 3-second calibration dialog with live feedback.
 """
 
+from typing import Any
+
 from PySide6 import QtCore, QtGui, QtWidgets
 
 from db.manager import DatabaseManager
@@ -111,9 +113,17 @@ class SessionTrendDashboard(QtWidgets.QMainWindow):
     def _init_ui(self) -> None:
         central = QtWidgets.QWidget()
         self.setCentralWidget(central)
-        main_layout = QtWidgets.QVBoxLayout(central)
-        main_layout.setContentsMargins(20, 20, 20, 20)
-        main_layout.setSpacing(18)
+        root_layout = QtWidgets.QVBoxLayout(central)
+        root_layout.setContentsMargins(12, 12, 12, 12)
+
+        self.tabs = QtWidgets.QTabWidget()
+        root_layout.addWidget(self.tabs)
+
+        # Tab 1: Sesi & Tren Historis
+        tab_history = QtWidgets.QWidget()
+        main_layout = QtWidgets.QVBoxLayout(tab_history)
+        main_layout.setContentsMargins(16, 16, 16, 16)
+        main_layout.setSpacing(16)
 
         # 1. Header Card: Adherence & Bounds
         cards_layout = QtWidgets.QHBoxLayout()
@@ -182,6 +192,43 @@ class SessionTrendDashboard(QtWidgets.QMainWindow):
         )
         table_layout.addWidget(self.table)
         main_layout.addWidget(buckets_box)
+        self.tabs.addTab(tab_history, "Sesi & Tren Historis")
+
+        # Tab 2: Live Telemetry & Tuning Ambang Batas (Bab 8)
+        tab_live = QtWidgets.QWidget()
+        live_layout = QtWidgets.QVBoxLayout(tab_live)
+        live_layout.setContentsMargins(16, 16, 16, 16)
+        live_layout.setSpacing(14)
+
+        self.live_status_label = QtWidgets.QLabel(
+            "Visibilitas: MENUNGGU SINYAL | Mode: — | Status: DIAM"
+        )
+        self.live_status_label.setStyleSheet(
+            "font-size: 13px; font-weight: bold; color: #60A5FA; padding: 4px;"
+        )
+        live_layout.addWidget(self.live_status_label)
+
+        self.live_table = QtWidgets.QTableWidget()
+        self.live_table.setColumnCount(7)
+        self.live_table.setHorizontalHeaderLabels(
+            [
+                "Metrik Postur",
+                "d_hat(t)",
+                "sigma(t) MAD",
+                "tau_enter(t)",
+                "tau_exit",
+                "Status",
+                "Ember Debounce (15s)",
+            ]
+        )
+        self.live_table.setRowCount(5)
+        self.live_table.horizontalHeader().setStretchLastSection(True)
+        self.live_table.horizontalHeader().setSectionResizeMode(
+            QtWidgets.QHeaderView.ResizeMode.ResizeToContents
+        )
+        self.live_table.setStyleSheet(self.table.styleSheet())
+        live_layout.addWidget(self.live_table)
+        self.tabs.addTab(tab_live, "Live Telemetry (Tuning Bab 8)")
 
     def _create_metric_card(
         self, title: str, initial_value: str, accent_hex: str
@@ -265,3 +312,62 @@ class SessionTrendDashboard(QtWidgets.QMainWindow):
                 self.table.setItem(r_idx, 5, QtWidgets.QTableWidgetItem(neck_str))
                 slump_str = f"{b[6]:.3f}" if b[6] is not None else "—"
                 self.table.setItem(r_idx, 6, QtWidgets.QTableWidgetItem(slump_str))
+
+    def update_live_telemetry(self, data: dict[str, Any]) -> None:
+        """Update live telemetry tab with real-time deviations and thresholds."""
+        if not hasattr(self, "live_table"):
+            return
+
+        vis = data.get("vis_state", "UNKNOWN")
+        mode = data.get("op_mode", "UNKNOWN")
+        moving = data.get("is_moving", False)
+        v_norm = data.get("v_norm", 0.0)
+
+        mov_str = f"BERGERAK (v={v_norm:.3f})" if moving else f"DIAM (v={v_norm:.3f})"
+        self.live_status_label.setText(f"Visibilitas: {vis} | Mode: {mode} | Status: {mov_str}")
+
+        d_hat = data.get("d_hat", {})
+        sigmas = data.get("sigmas", {})
+        tau_enter = data.get("tau_enter", {})
+        tau_exit = data.get("tau_exit", {})
+        violations = data.get("violations", {})
+        buckets = data.get("buckets", {})
+
+        metrics = [
+            ("fhp", "HEAD_FORWARD"),
+            ("neck", "TORSO_NECK_COMP"),
+            ("slump", "SHOULDER_SLUMP"),
+            ("pitch", "GAZE_DOWN_PITCH"),
+            ("tilt", "CORONAL_ASYMMETRY"),
+        ]
+
+        for r_idx, (key, label) in enumerate(metrics):
+            val = d_hat.get(key, 0.0)
+            sig = sigmas.get(key, 0.0)
+            t_ent = tau_enter.get(key, 0.0)
+            t_ex = tau_exit.get(key, 0.0)
+            is_v = violations.get(key, False)
+            b_s = buckets.get(key, 0.0)
+
+            is_deg = key in ("pitch", "tilt")
+            val_str = f"{val:+.1f}°" if is_deg else f"{val:+.4f}"
+            sig_str = f"{sig:.2f}°" if is_deg else f"{sig:.4f}"
+            ent_str = f"{t_ent:.1f}°" if is_deg else f"{t_ent:.3f}"
+            ex_str = f"{t_ex:.1f}°" if is_deg else f"{t_ex:.3f}"
+            status_str = "MELANGGAR" if is_v else "OK"
+            bar_fill = int(min(10, max(0, (b_s / 15.0) * 10)))
+            b_str = f"[{'#' * bar_fill}{'-' * (10 - bar_fill)}] {b_s:4.1f}s"
+
+            self.live_table.setItem(r_idx, 0, QtWidgets.QTableWidgetItem(label))
+            self.live_table.setItem(r_idx, 1, QtWidgets.QTableWidgetItem(val_str))
+            self.live_table.setItem(r_idx, 2, QtWidgets.QTableWidgetItem(sig_str))
+            self.live_table.setItem(r_idx, 3, QtWidgets.QTableWidgetItem(ent_str))
+            self.live_table.setItem(r_idx, 4, QtWidgets.QTableWidgetItem(ex_str))
+
+            stat_item = QtWidgets.QTableWidgetItem(status_str)
+            if is_v:
+                stat_item.setForeground(QtGui.QBrush(QtGui.QColor("#EF4444")))
+            else:
+                stat_item.setForeground(QtGui.QBrush(QtGui.QColor("#10B981")))
+            self.live_table.setItem(r_idx, 5, stat_item)
+            self.live_table.setItem(r_idx, 6, QtWidgets.QTableWidgetItem(b_str))

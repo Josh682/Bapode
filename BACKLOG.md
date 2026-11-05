@@ -39,3 +39,12 @@
 - [x] **M4.3 — Jendela Kalibrasi Terpandu & Dashboard Tren (`src/ui/dashboard.py`)**
   - Referensi: `docs/DESIGN_SYSTEM.md`, `docs/specs/04-telemetry-and-schema.md`
   - Implementasikan dialog kalibrasi 3 detik dan visualisasi ringkasan kepatuhan dengan batas konservatif oklusi serta tabel *bucket* 5 menit.
+
+## Fase 4.5: Kesiapan Produksi & Verifikasi Webcam Fisik
+- [x] **M4.5 — Model Management, Konfigurasi Eksternal, Live Telemetry TUI & Smoke Test Webcam**
+  - `scripts/download_models.py` mengunduh `pose_landmarker_lite.task` dan `face_landmarker.task` dari Google MediaPipe Storage secara otomatis saat aplikasi start.
+  - `FaceLandmarkerOptions` mengaktifkan `output_facial_transformation_matrixes=True` dengan dekomposisi matriks rotasi Euler 3D.
+  - Ambang batas metrik diekstrak ke `config.toml` dengan loader sadar-tipe di `src/config.py`.
+  - CLI flag `--calibrate-thresholds` dan tab Live Telemetry pada Dashboard menampilkan deviasi $\hat{d}_i(t)$, $\sigma_i(t)$, ambang masuk/keluar, dan status gerak real-time untuk tuning empiris (Bab 8 spesifikasi).
+  - Skrip pengujian webcam fisik `scripts/smoke_test_webcam.py` memverifikasi akuisisi UVC 5 FPS dan ekstraksi 5 metrik tanpa error.
+

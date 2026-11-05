@@ -34,6 +34,7 @@ class PostureGuardianApp(QtCore.QObject):
         camera_index: int = 0,
         mock_camera: bool = False,
         headless: bool = False,
+        calibrate_thresholds: bool = False,
         parent: QtCore.QObject | None = None,
     ) -> None:
         super().__init__(parent)
@@ -41,6 +42,7 @@ class PostureGuardianApp(QtCore.QObject):
         self.camera_index = camera_index
         self.mock_camera = mock_camera
         self.headless = headless
+        self.calibrate_thresholds = calibrate_thresholds
 
         # 1. Initialize SQLite Database & Worker Thread 2
         self.db_manager = DatabaseManager(self.db_path)
@@ -67,7 +69,11 @@ class PostureGuardianApp(QtCore.QObject):
         self.power_listener.system_will_sleep.connect(self.vision_worker.on_os_sleep)
         self.power_listener.system_did_wake.connect(self.vision_worker.on_os_wake)
 
-        # 5. Initialize UI (Main Thread)
+        # 5. Connect live telemetry for threshold tuning
+        if self.calibrate_thresholds:
+            self.vision_worker.live_telemetry.connect(self._render_live_terminal_telemetry)
+
+        # 6. Initialize UI (Main Thread)
         self.hud_overlay: HUDOverlay | None = None
         self.tray_manager: SystemTrayManager | None = None
         self.dashboard_window: SessionTrendDashboard | None = None
@@ -92,6 +98,7 @@ class PostureGuardianApp(QtCore.QObject):
         )
         self.vision_worker.calibration_progress.connect(self.calib_dialog.update_progress)
         self.vision_worker.calibration_completed.connect(self._on_calibration_completed)
+        self.vision_worker.live_telemetry.connect(self.dashboard_window.update_live_telemetry)
 
         # Connect Tray actions
         self.tray_manager.recalibrate_requested.connect(self._start_calibration_flow)
@@ -145,6 +152,70 @@ class PostureGuardianApp(QtCore.QObject):
         if app is not None:
             app.quit()
 
+    def _render_live_terminal_telemetry(self, data: dict[str, Any]) -> None:
+        """Render ANSI live telemetry terminal screen for empirical threshold tuning (Bab 8)."""
+        vis = data.get("vis_state", "UNKNOWN")
+        mode = data.get("op_mode", "UNKNOWN")
+        ui = data.get("ui_level", "SILENT_OK")
+        moving = data.get("is_moving", False)
+        v_norm = data.get("v_norm", 0.0)
+        d_hat = data.get("d_hat", {})
+        sigmas = data.get("sigmas", {})
+        tau_enter = data.get("tau_enter", {})
+        tau_exit = data.get("tau_exit", {})
+        violations = data.get("violations", {})
+        buckets = data.get("buckets", {})
+
+        out = [
+            "\033[H\033[2J",
+            "=" * 80,
+            " Posture Guardian v3.0 — Live Telemetry & Threshold Tuning (Bab 8)",
+            f" Mode: {mode:<18} | Visibility: {vis:<14} | UI Level: {ui}",
+            f" Gerak: {'MOVING' if moving else 'STATIONARY':<10} | v_norm: {v_norm:.3f}",
+            "=" * 80,
+            (
+                f" {'Metrik':<12} {'d_hat':<10} {'sigma':<10} {'tau_in':<9} "
+                f"{'tau_out':<9} {'Status':<9} {'Debounce (15s)':<14}"
+            ),
+            "-" * 80,
+        ]
+
+        metric_names = [
+            ("fhp", "HEAD_FORWARD"),
+            ("neck", "NECK_COMP"),
+            ("slump", "SLUMP_DROP"),
+            ("pitch", "GAZE_PITCH"),
+            ("tilt", "CORONAL_TILT"),
+        ]
+
+        for key, label in metric_names:
+            val = d_hat.get(key, 0.0)
+            sig = sigmas.get(key, 0.0)
+            t_ent = tau_enter.get(key, 0.0)
+            t_ex = tau_exit.get(key, 0.0)
+            is_v = violations.get(key, False)
+            b_s = buckets.get(key, 0.0)
+
+            is_deg = key in ("pitch", "tilt")
+            val_str = f"{val:+.1f}°" if is_deg else f"{val:+.4f}"
+            sig_str = f"{sig:.2f}°" if is_deg else f"{sig:.4f}"
+            ent_str = f"{t_ent:.1f}°" if is_deg else f"{t_ent:.3f}"
+            ex_str = f"{t_ex:.1f}°" if is_deg else f"{t_ex:.3f}"
+            stat_str = "MELANGGAR" if is_v else "OK"
+
+            fill_blocks = int(min(10, max(0, (b_s / 15.0) * 10)))
+            bar_str = "[" + "#" * fill_blocks + "-" * (10 - fill_blocks) + f"] {b_s:4.1f}s"
+
+            out.append(
+                f" {label:<12} {val_str:<10} {sig_str:<10} {ent_str:<9} "
+                f"{ex_str:<9} {stat_str:<9} {bar_str:<14}"
+            )
+
+        out.append("=" * 80)
+        out.append(" Tekan Ctrl+C untuk keluar.")
+        sys.stdout.write("\n".join(out) + "\n")
+        sys.stdout.flush()
+
 
 def main() -> int:
     """CLI bootstrap and entry point."""
@@ -157,6 +228,11 @@ def main() -> int:
         "--db-path", type=str, default="posture_guardian.db", help="SQLite database path"
     )
     parser.add_argument("--headless", action="store_true", help="Run headless without GUI")
+    parser.add_argument(
+        "--calibrate-thresholds",
+        action="store_true",
+        help="Display real-time live telemetry (d_hat, sigmas, visibility) for empirical tuning",
+    )
     args = parser.parse_args()
 
     app = QtWidgets.QApplication.instance()
@@ -171,7 +247,8 @@ def main() -> int:
         db_path=args.db_path,
         camera_index=args.camera_index,
         mock_camera=args.mock_camera,
-        headless=args.headless,
+        headless=args.headless or args.calibrate_thresholds,
+        calibrate_thresholds=args.calibrate_thresholds,
     )
     coordinator.start()
 
