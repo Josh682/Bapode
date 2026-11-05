@@ -12,14 +12,13 @@ import argparse
 import sys
 from typing import Any
 
-from PySide6 import QtCore, QtWidgets
-
 from camera.reader import CameraReader
 from db.manager import DatabaseManager
 from db.worker import DatabaseWorker
 from ui.dashboard import GuidedCalibrationDialog, SessionTrendDashboard
 from ui.overlay import HUDOverlay
 from ui.platform_bridge import PlatformPowerListener
+from ui.qt import QtCore, QtWidgets
 from ui.tray import SystemTrayManager
 from vision.detector import SequentialLandmarkDetector
 from vision.worker import VisionTrackerWorker
@@ -235,9 +234,12 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    app = QtWidgets.QApplication.instance()
+    app = QtCore.QCoreApplication.instance()
     if app is None:
-        app = QtWidgets.QApplication(sys.argv)
+        if args.headless or args.calibrate_thresholds:
+            app = QtCore.QCoreApplication(sys.argv)
+        else:
+            app = QtWidgets.QApplication(sys.argv)
 
     # Don't quit when calibration dialog or dashboard closes
     if isinstance(app, QtWidgets.QApplication):
