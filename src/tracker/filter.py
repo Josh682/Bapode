@@ -10,6 +10,8 @@ Implements:
 import math
 from collections import deque
 
+from config import load_config
+
 
 class SlidingMedian3:
     """Sliding median filter over a 3-sample window."""
@@ -72,10 +74,11 @@ class NormalizedVelocityDetector:
 
     def __init__(
         self,
-        v_thresh: float = 0.15,
+        v_thresh: float | None = None,
         smoothing_alpha: float = 0.5,
     ) -> None:
-        self.v_thresh = v_thresh
+        cfg = load_config()
+        self.v_thresh = v_thresh if v_thresh is not None else cfg.motion.v_thresh
         self.smoothing_alpha = smoothing_alpha
 
         # Smoothed previous shoulder geometry

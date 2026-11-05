@@ -1,0 +1,80 @@
+# ==============================================================================
+# Posture Guardian v3.0 — Configuration File
+# Reference: docs/specs/01-vision-and-metrics.md, docs/specs/02-signal-and-tracker.md,
+#            docs/specs/03-calibration-and-drift.md
+# ==============================================================================
+
+[vision]
+camera_index = 0
+target_fps = 5.0
+frame_width = 1280
+frame_height = 720
+models_dir = "models"
+pose_model = "pose_landmarker_lite.task"
+face_model = "face_landmarker.task"
+
+[motion]
+# Ambang batas detektor gerak kuasi-statis (normalisasi lebar-bahu per detik)
+v_thresh = 0.15
+# Batas durasi gerbang kecepatan anti-freeze (detik)
+freeze_max_s = 3.0
+smoothing_alpha = 0.5
+
+# ------------------------------------------------------------------------------
+# Ambang Batas Metrik Geometris (Threshold Tuning Bab 8)
+# Satuan:
+#   - fhp, neck, slump: deviasi proporsional tanpa dimensi
+#   - pitch, tilt: derajat sudut (degrees)
+# ------------------------------------------------------------------------------
+
+[metrics.tau_default_enter]
+# Ambang batas masuk pelanggaran default (saat noise rendah)
+fhp = 0.08
+neck = 0.08
+slump = 0.06
+pitch = 12.0
+tilt = 8.0
+
+[metrics.tau_exit]
+# Ambang batas keluar pelanggaran (histeresis pemadaman alert)
+fhp = 0.04
+neck = 0.04
+slump = 0.03
+pitch = 6.0
+tilt = 4.0
+
+[metrics.tau_cap]
+# Batas atas plafon adaptasi noise (kondisi pencahayaan buruk)
+fhp = 0.18
+neck = 0.16
+slump = 0.14
+pitch = 22.0
+tilt = 16.0
+
+# ------------------------------------------------------------------------------
+# Pengaturan Tracker & Eskalasi UI
+# ------------------------------------------------------------------------------
+[tracker]
+debounce_time_s = 15.0
+ambient_warn_threshold_s = 7.5
+step_down_floor_s = 9.0
+cooldown_s = 30.0
+microbreak_duration_s = 60.0
+tau_attack_s = 1.0
+tau_release_s = 0.3
+
+# ------------------------------------------------------------------------------
+# Pengaturan Kalibrasi Terpandu (3 Detik)
+# ------------------------------------------------------------------------------
+[calibration]
+target_samples = 15
+min_samples = 15
+yaw_head_limit_deg = 8.0
+roll_head_limit_deg = 5.0
+shoulder_tilt_limit_deg = 6.0
+neck_ratio_min = 0.35
+neck_ratio_max = 0.75
+mad_rejection_factor = 0.80
+chair_drift_low = 0.78
+chair_drift_high = 1.30
+drift_sustain_time_s = 10.0

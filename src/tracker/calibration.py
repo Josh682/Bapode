@@ -26,6 +26,7 @@ from collections import deque
 from collections.abc import Sequence
 from dataclasses import dataclass
 
+from config import load_config
 from db.manager import CalibrationProfileRecord
 from vision.landmarks import FaceLandmarkData, PoseLandmarkData
 from vision.metrics import (
@@ -36,23 +37,12 @@ from vision.metrics import (
     calculate_yaw_compensated_eye_width,
 )
 
-# Standard default enter thresholds
-DEFAULT_TAU_ENTER: dict[str, float] = {
-    "fhp": 0.08,
-    "neck": 0.08,
-    "slump": 0.06,
-    "pitch": 12.0,
-    "tilt": 8.0,
-}
+# Standard default enter thresholds loaded from config.toml
+_cfg = load_config()
+DEFAULT_TAU_ENTER: dict[str, float] = dict(_cfg.metrics.tau_default_enter)
 
-# Standard default ceiling caps (tau_cap)
-DEFAULT_TAU_CAP: dict[str, float] = {
-    "fhp": 0.16,
-    "neck": 0.16,
-    "slump": 0.12,
-    "pitch": 24.0,
-    "tilt": 16.0,
-}
+# Standard default ceiling caps (tau_cap) loaded from config.toml
+DEFAULT_TAU_CAP: dict[str, float] = dict(_cfg.metrics.tau_cap)
 
 LOW_LIGHT_WARNING_MESSAGE = "Kualitas Cahaya Kamera Buruk — Akurasi Menurun"
 RECALIBRATION_REASON_NOISY = "Pencahayaan terlalu redup atau posisi belum stabil"

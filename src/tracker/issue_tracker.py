@@ -15,6 +15,7 @@ Implements:
 from collections import deque
 from dataclasses import dataclass
 
+from config import load_config
 from tracker.filter import AsymmetricEMA, SlidingMedian3
 from tracker.states import PostureViolationFlags, UIIntrusivenessLevel
 
@@ -214,13 +215,29 @@ class PostureEscalationController:
         self.duty_microbreak_threshold = duty_microbreak_threshold
         self.alerts_microbreak_count = alerts_microbreak_count
 
-        # Default hysteresis thresholds per metric
+        # Default hysteresis thresholds per metric (loaded from config.toml)
+        cfg = load_config()
         self.trackers: dict[str, IssueTracker] = {
-            "fhp": IssueTracker(tau_enter=0.08, tau_exit=0.04),
-            "neck": IssueTracker(tau_enter=0.08, tau_exit=0.04),
-            "slump": IssueTracker(tau_enter=0.06, tau_exit=0.03),
-            "pitch": IssueTracker(tau_enter=12.0, tau_exit=6.0),
-            "tilt": IssueTracker(tau_enter=8.0, tau_exit=4.0),
+            "fhp": IssueTracker(
+                tau_enter=cfg.metrics.tau_default_enter.get("fhp", 0.08),
+                tau_exit=cfg.metrics.tau_exit.get("fhp", 0.04),
+            ),
+            "neck": IssueTracker(
+                tau_enter=cfg.metrics.tau_default_enter.get("neck", 0.08),
+                tau_exit=cfg.metrics.tau_exit.get("neck", 0.04),
+            ),
+            "slump": IssueTracker(
+                tau_enter=cfg.metrics.tau_default_enter.get("slump", 0.06),
+                tau_exit=cfg.metrics.tau_exit.get("slump", 0.03),
+            ),
+            "pitch": IssueTracker(
+                tau_enter=cfg.metrics.tau_default_enter.get("pitch", 12.0),
+                tau_exit=cfg.metrics.tau_exit.get("pitch", 6.0),
+            ),
+            "tilt": IssueTracker(
+                tau_enter=cfg.metrics.tau_default_enter.get("tilt", 8.0),
+                tau_exit=cfg.metrics.tau_exit.get("tilt", 4.0),
+            ),
         }
 
     def reset(self) -> None:
