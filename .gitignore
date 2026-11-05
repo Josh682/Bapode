@@ -50,6 +50,11 @@ venv.bak/
 .coverage
 htmlcov/
 
+# MediaPipe Task Models
+models/*.task
+*.task
+
+
 # IDE & OS
 .DS_Store
 .vscode/
