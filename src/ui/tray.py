@@ -64,6 +64,16 @@ class SystemTrayManager(QtCore.QObject):
         self.set_color_indicator("#10B981", "Posture Guardian: Aktif")
         self.tray_icon.show()
 
+    def show_startup_notification(self) -> None:
+        """Display native OS notification banner confirming app is running in tray."""
+        if self.tray_icon.isSystemTrayAvailable():
+            self.tray_icon.showMessage(
+                "Posture Guardian v3.0",
+                "Aplikasi aktif memantau di Menu Bar (kanan atas). Klik ikon untuk opsi.",
+                QtWidgets.QSystemTrayIcon.MessageIcon.Information,
+                3000,
+            )
+
     def set_color_indicator(self, hex_color: str, tooltip: str) -> None:
         """Generate and set a round status icon of given color."""
         pixmap = QtGui.QPixmap(64, 64)

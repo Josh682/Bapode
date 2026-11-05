@@ -34,6 +34,8 @@ class PostureGuardianApp(QtCore.QObject):
         mock_camera: bool = False,
         headless: bool = False,
         calibrate_thresholds: bool = False,
+        show_dashboard: bool = False,
+        start_calibration: bool = False,
         parent: QtCore.QObject | None = None,
     ) -> None:
         super().__init__(parent)
@@ -42,6 +44,8 @@ class PostureGuardianApp(QtCore.QObject):
         self.mock_camera = mock_camera
         self.headless = headless
         self.calibrate_thresholds = calibrate_thresholds
+        self.show_dashboard = show_dashboard
+        self.start_calibration = start_calibration
 
         # 1. Initialize SQLite Database & Worker Thread 2
         self.db_manager = DatabaseManager(self.db_path)
@@ -105,6 +109,9 @@ class PostureGuardianApp(QtCore.QObject):
         self.tray_manager.open_dashboard_requested.connect(self._open_dashboard)
         self.tray_manager.quit_requested.connect(self.shutdown)
 
+        # Notify user that app is running in Menu Bar
+        self.tray_manager.show_startup_notification()
+
     def _start_calibration_flow(self) -> None:
         """Trigger calibration and open guided dialog."""
         self.vision_worker.trigger_calibration()
@@ -129,6 +136,24 @@ class PostureGuardianApp(QtCore.QObject):
         self.db_worker.start()
         self.camera_reader.start()
         self.vision_worker.start()
+
+        if not self.headless and not self.calibrate_thresholds:
+            print("\n" + "=" * 80)
+            print(" Posture Guardian v3.0 Berjalan di Latar Belakang (Background Utility)")
+            print("=" * 80)
+            print(" • Status Icon : Periksa Menu Bar macOS di pojok kanan atas (lingkaran hijau)")
+            print(" • Menu Aksi   : Klik ikon Menu Bar untuk:")
+            print("                 - Buka Dashboard Sesi & Tren Historis")
+            print("                 - Kalibrasi Ulang (3 Detik)")
+            print("                 - Jeda Pemantauan (Snooze 15 / 30 / 60 Menit)")
+            print("                 - Keluar Aplikasi")
+            print(" • HUD Overlay : Otomatis muncul di layar jika postur melanggar (>= 15 detik)")
+            print("=" * 80 + "\n")
+
+            if self.show_dashboard:
+                self._open_dashboard()
+            elif self.start_calibration:
+                self._start_calibration_flow()
 
     def shutdown(self) -> None:
         """Gracefully terminate all workers and flush data without deadlock."""
@@ -232,6 +257,16 @@ def main() -> int:
         action="store_true",
         help="Display real-time live telemetry (d_hat, sigmas, visibility) for empirical tuning",
     )
+    parser.add_argument(
+        "--show-dashboard",
+        action="store_true",
+        help="Open dashboard window immediately upon application launch",
+    )
+    parser.add_argument(
+        "--calibrate",
+        action="store_true",
+        help="Open 3-second guided calibration dialog upon launch",
+    )
     args = parser.parse_args()
 
     app = QtCore.QCoreApplication.instance()
@@ -251,6 +286,8 @@ def main() -> int:
         mock_camera=args.mock_camera,
         headless=args.headless or args.calibrate_thresholds,
         calibrate_thresholds=args.calibrate_thresholds,
+        show_dashboard=args.show_dashboard,
+        start_calibration=args.calibrate,
     )
     coordinator.start()
 
