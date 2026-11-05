@@ -187,8 +187,14 @@ class TestPostureEscalationController:
 
         # 1. SILENT_OK: D_i < 7.5s
         ui, _, states = controller.update(
-            d_fhp=0.20, d_neck=0.0, d_slump=0.0, d_pitch=0.0, d_tilt=0.0,
-            dt=dt, is_moving=False, current_time=curr_t,
+            d_fhp=0.20,
+            d_neck=0.0,
+            d_slump=0.0,
+            d_pitch=0.0,
+            d_tilt=0.0,
+            dt=dt,
+            is_moving=False,
+            current_time=curr_t,
         )
         assert ui == UIIntrusivenessLevel.SILENT_OK
 
@@ -196,8 +202,14 @@ class TestPostureEscalationController:
         for _ in range(39):  # ~8.0s total
             curr_t += dt
             ui, _, states = controller.update(
-                d_fhp=0.20, d_neck=0.0, d_slump=0.0, d_pitch=0.0, d_tilt=0.0,
-                dt=dt, is_moving=False, current_time=curr_t,
+                d_fhp=0.20,
+                d_neck=0.0,
+                d_slump=0.0,
+                d_pitch=0.0,
+                d_tilt=0.0,
+                dt=dt,
+                is_moving=False,
+                current_time=curr_t,
             )
         assert ui == UIIntrusivenessLevel.AMBIENT_WARN
 
@@ -205,8 +217,14 @@ class TestPostureEscalationController:
         for _ in range(36):  # ~15.2s total
             curr_t += dt
             ui, _, states = controller.update(
-                d_fhp=0.20, d_neck=0.0, d_slump=0.0, d_pitch=0.0, d_tilt=0.0,
-                dt=dt, is_moving=False, current_time=curr_t,
+                d_fhp=0.20,
+                d_neck=0.0,
+                d_slump=0.0,
+                d_pitch=0.0,
+                d_tilt=0.0,
+                dt=dt,
+                is_moving=False,
+                current_time=curr_t,
             )
         assert ui == UIIntrusivenessLevel.ACTIVE_OVERLAY
 
@@ -214,8 +232,14 @@ class TestPostureEscalationController:
         for _ in range(5):
             curr_t += dt
             ui, _, states = controller.update(
-                d_fhp=0.0, d_neck=0.0, d_slump=0.0, d_pitch=0.0, d_tilt=0.0,
-                dt=dt, is_moving=False, current_time=curr_t,
+                d_fhp=0.0,
+                d_neck=0.0,
+                d_slump=0.0,
+                d_pitch=0.0,
+                d_tilt=0.0,
+                dt=dt,
+                is_moving=False,
+                current_time=curr_t,
             )
         assert ui != UIIntrusivenessLevel.ACTIVE_OVERLAY
 
@@ -225,8 +249,14 @@ class TestPostureEscalationController:
         for _ in range(40):
             curr_t += dt
             ui, _, states = controller.update(
-                d_fhp=0.20, d_neck=0.0, d_slump=0.0, d_pitch=0.0, d_tilt=0.0,
-                dt=dt, is_moving=False, current_time=curr_t,
+                d_fhp=0.20,
+                d_neck=0.0,
+                d_slump=0.0,
+                d_pitch=0.0,
+                d_tilt=0.0,
+                dt=dt,
+                is_moving=False,
+                current_time=curr_t,
             )
         assert states["fhp"].alert_active is True
         assert ui == UIIntrusivenessLevel.SUPPRESSED_COOLDOWN
@@ -235,8 +265,14 @@ class TestPostureEscalationController:
         for _ in range(5):
             curr_t += dt
             controller.update(
-                d_fhp=0.0, d_neck=0.0, d_slump=0.0, d_pitch=0.0, d_tilt=0.0,
-                dt=dt, is_moving=False, current_time=curr_t,
+                d_fhp=0.0,
+                d_neck=0.0,
+                d_slump=0.0,
+                d_pitch=0.0,
+                d_tilt=0.0,
+                dt=dt,
+                is_moving=False,
+                current_time=curr_t,
             )
 
         # 5. MICROBREAK_PROMPT: 3 alerts in 10 minutes
@@ -244,16 +280,28 @@ class TestPostureEscalationController:
         for _ in range(175):
             curr_t += dt
             controller.update(
-                d_fhp=0.0, d_neck=0.0, d_slump=0.0, d_pitch=0.0, d_tilt=0.0,
-                dt=dt, is_moving=False, current_time=curr_t,
+                d_fhp=0.0,
+                d_neck=0.0,
+                d_slump=0.0,
+                d_pitch=0.0,
+                d_tilt=0.0,
+                dt=dt,
+                is_moving=False,
+                current_time=curr_t,
             )
 
         # Trigger alert #3 (80 steps to account for initial EMA filter ramp-up)
         for _ in range(80):
             curr_t += dt
             ui, _, states = controller.update(
-                d_fhp=0.20, d_neck=0.0, d_slump=0.0, d_pitch=0.0, d_tilt=0.0,
-                dt=dt, is_moving=False, current_time=curr_t,
+                d_fhp=0.20,
+                d_neck=0.0,
+                d_slump=0.0,
+                d_pitch=0.0,
+                d_tilt=0.0,
+                dt=dt,
+                is_moving=False,
+                current_time=curr_t,
             )
         # Now 3 alerts in rolling 10-minute window -> escalates to MICROBREAK_PROMPT!
         assert states["fhp"].alert_count_10m >= 3

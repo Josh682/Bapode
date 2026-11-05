@@ -53,10 +53,7 @@ class BoundingBox:
 
     def contains(self, point: Point2D) -> bool:
         """Check if point is inside bounding box."""
-        return (
-            self.x_min <= point.x <= self.x_max
-            and self.y_min <= point.y <= self.y_max
-        )
+        return self.x_min <= point.x <= self.x_max and self.y_min <= point.y <= self.y_max
 
 
 @dataclass(frozen=True, slots=True)

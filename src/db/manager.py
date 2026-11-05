@@ -241,12 +241,8 @@ class DatabaseManager:
         """
         total_observed = measurable_seconds + occluded_lower_seconds + occluded_upper_seconds
         coverage = (measurable_seconds / total_observed) if total_observed > 0.0 else 1.0
-        ref_adherence = (
-            (adherent_seconds / measurable_seconds) if measurable_seconds > 0.0 else 1.0
-        )
-        conservative_bound = (
-            (adherent_seconds / total_observed) if total_observed > 0.0 else 1.0
-        )
+        ref_adherence = (adherent_seconds / measurable_seconds) if measurable_seconds > 0.0 else 1.0
+        conservative_bound = (adherent_seconds / total_observed) if total_observed > 0.0 else 1.0
         return coverage, ref_adherence, conservative_bound
 
     def create_session(self, start_time: datetime | None = None) -> int:
@@ -502,10 +498,7 @@ class DatabaseManager:
         alert_dismissal_sec: float | None = None,
     ) -> None:
         """Flush and commit the active interval if one exists."""
-        if (
-            self._current_interval_id is not None
-            and self._current_interval_start is not None
-        ):
+        if self._current_interval_id is not None and self._current_interval_start is not None:
             end_t = flush_time or datetime.now()
             duration = max(0.0, (end_t - self._current_interval_start).total_seconds())
             self._update_interval_duration(

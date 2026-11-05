@@ -22,19 +22,20 @@
   - Implementasikan *Plausibility Gate* 15 sampel, *Running Quiet-Period Noise Floor*, detektor setup drift ($\ge 10\text{ detik}$), RLE interval manager, agregator *bucket* 5 menit bebas dilusi (`mean_violating_*`, `p95_*`), dan batas kepatuhan sesi.
 
 ## Fase 3: Akuisisi Kamera & Fusi MediaPipe
-- [ ] **M3.1 — Single-Reader Camera Thread 5 FPS (`src/camera/reader.py`)**
+- [x] **M3.1 — Single-Reader Camera Thread 5 FPS (`src/camera/reader.py`)**
   - Referensi: `docs/specs/01-vision-and-metrics.md`, `docs/ARCHITECTURE.md`
   - Implementasikan pembacaan kamera $\Delta t \approx 200\text{ ms}$ dengan *monotonic timestamp* dan *latest-frame queue* berukuran $1$.
-- [ ] **M3.2 — Sequential Pose + Face Engine & Multi-Person Association (`src/vision/detector.py`)**
+- [x] **M3.2 — Sequential Pose + Face Engine & Multi-Person Association (`src/vision/detector.py`)**
   - Referensi: `docs/specs/01-vision-and-metrics.md`
   - Integrasikan `MediaPipe Pose Landmarker (Lite)` dan `MediaPipe Face Landmarker` beserta verifikasi jarak Euclidean hidung ke pusat wajah ($\lt 0.25 \cdot W_{\text{sh}}$).
 
 ## Fase 4: Antarmuka Desktop & Integrasi OS
-- [ ] **M4.1 — Non-Activating & Screen-Share Safe HUD Overlay (`src/ui/overlay.py`)**
+- [x] **M4.1 — Non-Activating & Screen-Share Safe HUD Overlay (`src/ui/overlay.py`)**
   - Referensi: `docs/DESIGN_SYSTEM.md`, `docs/ARCHITECTURE.md`
   - Implementasikan jendela *overlay* tembus klik, anti-curi fokus, dan tersembunyi dari tangkapan layar rapat (`WDA_EXCLUDEFROMCAPTURE` / `NSWindowSharingNone`).
-- [ ] **M4.2 — System Tray, Quick Snooze, & OS Power Events (`src/ui/tray.py`)**
+- [x] **M4.2 — System Tray, Quick Snooze, & OS Power Events (`src/ui/tray.py`)**
   - Referensi: `docs/DESIGN_SYSTEM.md`, `docs/ARCHITECTURE.md`
   - Implementasikan menu *System Tray*, tombol *Snooze* ($15/30/60\text{ menit}$), dan *hook* *flush* database saat *sleep/wake*.
-- [ ] **M4.3 — Jendela Kalibrasi Terpandu & Dashboard Tren (`src/ui/dashboard.py`)**
+- [x] **M4.3 — Jendela Kalibrasi Terpandu & Dashboard Tren (`src/ui/dashboard.py`)**
   - Referensi: `docs/DESIGN_SYSTEM.md`, `docs/specs/04-telemetry-and-schema.md`
+  - Implementasikan dialog kalibrasi 3 detik dan visualisasi ringkasan kepatuhan dengan batas konservatif oklusi serta tabel *bucket* 5 menit.

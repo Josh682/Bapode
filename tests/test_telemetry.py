@@ -290,9 +290,7 @@ class TestSessionOrchestratorIntegrations:
             if it.ui_level == "ACTIVE_OVERLAY" and it.alert_dismissal_sec is not None
         ]
         assert len(overlay_intervals) >= 1
-        assert overlay_intervals[0].alert_dismissal_sec == pytest.approx(
-            expected_latency, abs=0.5
-        )
+        assert overlay_intervals[0].alert_dismissal_sec == pytest.approx(expected_latency, abs=0.5)
 
     def test_database_persistence_and_adherence_bounds(
         self,

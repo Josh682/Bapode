@@ -107,13 +107,7 @@ class PostureViolationFlags:
     @property
     def has_any_violation(self) -> bool:
         """Return True if any of the 5 metrics is currently violating baseline."""
-        return (
-            self.v_fhp
-            or self.v_neck_comp
-            or self.v_slump
-            or self.v_gaze_pitch
-            or self.v_tilt
-        )
+        return self.v_fhp or self.v_neck_comp or self.v_slump or self.v_gaze_pitch or self.v_tilt
 
     def as_db_tuple(self) -> tuple[int, int, int, int, int]:
         """Convert flags to binary integers (0 or 1) for database insertion."""
