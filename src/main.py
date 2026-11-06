@@ -9,6 +9,7 @@ Coordinates:
 """
 
 import argparse
+import signal
 import sys
 from typing import Any
 
@@ -108,6 +109,10 @@ class PostureGuardianApp(QtCore.QObject):
         # Connect Dashboard actions
         self.dashboard_window.recalibrate_requested.connect(self._start_calibration_flow)
         self.dashboard_window.snooze_requested.connect(self.vision_worker.set_snooze)
+        self.dashboard_window.quit_requested.connect(self.shutdown)
+
+        # Connect Calibration dialog actions
+        self.calib_dialog.quit_requested.connect(self.shutdown)
 
         # Connect Tray actions
         self.tray_manager.recalibrate_requested.connect(self._start_calibration_flow)
@@ -163,6 +168,11 @@ class PostureGuardianApp(QtCore.QObject):
 
     def shutdown(self) -> None:
         """Gracefully terminate all workers and flush data without deadlock."""
+        if getattr(self, "_is_shutting_down", False):
+            return
+        self._is_shutting_down = True
+        print("[Posture Guardian] Menghentikan seluruh background worker dan mem-flush database...")
+
         # 1. Stop camera reader
         self.camera_reader.stop()
         if self.camera_reader.is_alive():
@@ -181,6 +191,7 @@ class PostureGuardianApp(QtCore.QObject):
         app = QtWidgets.QApplication.instance()
         if app is not None:
             app.quit()
+        print("[Posture Guardian] Shutdown selesai. Selamat beristirahat!")
 
     def _render_live_terminal_telemetry(self, data: dict[str, Any]) -> None:
         """Render ANSI live telemetry terminal screen for empirical threshold tuning (Bab 8)."""
@@ -299,6 +310,14 @@ def main() -> int:
 
     # Wire aboutToQuit for clean graceful shutdown
     app.aboutToQuit.connect(coordinator.shutdown)
+
+    # Handle Ctrl+C (SIGINT) cleanly from terminal
+    signal.signal(signal.SIGINT, lambda _sig, _frame: coordinator.shutdown())
+
+    # Heartbeat timer so Python interpreter gets control to process OS signals
+    heartbeat_timer = QtCore.QTimer()
+    heartbeat_timer.timeout.connect(lambda: None)
+    heartbeat_timer.start(500)
 
     return app.exec()
 

@@ -20,11 +20,17 @@ from ui.qt import QtCore, QtGui, QtWidgets
 class GuidedCalibrationDialog(QtWidgets.QDialog):
     """Dialog guiding user through 3-second posture calibration with real-time feedback."""
 
+    quit_requested = QtCore.Signal()
+
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Kalibrasi Referensi Postur (3 Detik)")
         self.setFixedSize(520, 500)
         self._init_ui()
+
+        # Keyboard shortcuts: Cmd+Q quits application
+        self.quit_shortcut = QtGui.QShortcut(QtGui.QKeySequence.StandardKey.Quit, self)
+        self.quit_shortcut.activated.connect(self.quit_requested.emit)
 
     def _init_ui(self) -> None:
         layout = QtWidgets.QVBoxLayout(self)
@@ -108,6 +114,7 @@ class SessionTrendDashboard(QtWidgets.QMainWindow):
 
     recalibrate_requested = QtCore.Signal()
     snooze_requested = QtCore.Signal(int)
+    quit_requested = QtCore.Signal()
 
     def __init__(
         self, db_manager: DatabaseManager, parent: QtWidgets.QWidget | None = None
@@ -117,6 +124,18 @@ class SessionTrendDashboard(QtWidgets.QMainWindow):
         self.setWindowTitle("Posture Guardian — Dashboard Sesi & Tren")
         self.resize(880, 640)
         self._init_ui()
+
+        # Keyboard shortcut: Cmd+Q quits application
+        self.quit_shortcut = QtGui.QShortcut(QtGui.QKeySequence.StandardKey.Quit, self)
+        self.quit_shortcut.setContext(QtCore.Qt.ShortcutContext.ApplicationShortcut)
+        self.quit_shortcut.activated.connect(self.quit_requested.emit)
+
+        # Native Menu Bar with Quit action (Cmd+Q)
+        menu_bar = self.menuBar()
+        app_menu = menu_bar.addMenu("Aplikasi")
+        quit_action = app_menu.addAction("Keluar Posture Guardian")
+        quit_action.setShortcut(QtGui.QKeySequence.StandardKey.Quit)
+        quit_action.triggered.connect(self.quit_requested.emit)
 
         # Auto-refresh timer
         self.refresh_timer = QtCore.QTimer(self)
@@ -176,8 +195,29 @@ class SessionTrendDashboard(QtWidgets.QMainWindow):
         )
         self.btn_snooze.clicked.connect(lambda: self.snooze_requested.emit(15))
 
+        self.btn_quit = QtWidgets.QPushButton("🚪 Keluar Aplikasi")
+        self.btn_quit.setStyleSheet(
+            """
+            QPushButton {
+                background-color: #4B1D1D;
+                color: #F87171;
+                font-weight: bold;
+                padding: 10px 18px;
+                border-radius: 8px;
+                font-size: 13px;
+                border: 1px solid #7F1D1D;
+            }
+            QPushButton:hover {
+                background-color: #7F1D1D;
+                color: #FFFFFF;
+            }
+            """
+        )
+        self.btn_quit.clicked.connect(self.quit_requested.emit)
+
         ctrl_bar.addWidget(self.btn_recalibrate)
         ctrl_bar.addWidget(self.btn_snooze)
+        ctrl_bar.addWidget(self.btn_quit)
         ctrl_bar.addStretch()
         cam_layout.addLayout(ctrl_bar)
         self.tabs.addTab(tab_camera, "📷 Pratinjau Kamera (Live)")
@@ -439,3 +479,13 @@ class SessionTrendDashboard(QtWidgets.QMainWindow):
         """Receive live annotated frame from VisionTrackerWorker."""
         if hasattr(self, "camera_preview") and self.isVisible():
             self.camera_preview.update_frame(image)
+
+    def closeEvent(self, event: QtGui.QCloseEvent) -> None:  # noqa: N802
+        """Handle window close event without terminating background tracking."""
+        print(
+            "\n[Posture Guardian] Jendela Dashboard ditutup. "
+            "Aplikasi tetap memantau di latar belakang (Menu Bar macOS kanan atas).\n"
+            "  • Untuk keluar aplikasi: Tekan Cmd+Q, klik tombol 'Keluar' pada Menu Bar, "
+            "atau tekan Ctrl+C di terminal.\n"
+        )
+        super().closeEvent(event)

@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import numpy as np
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 from tracker.states import PostureViolationFlags, VisibilityState
 from ui.camera_view import CameraPreviewWidget
@@ -84,3 +89,36 @@ class TestCameraPreviewWidget:
 
         assert widget._current_pixmap is not None
         assert not widget._current_pixmap.isNull()
+
+
+class TestDashboardAndCalibrationQuit:
+    """Verify Cmd+Q and quit signals in Dashboard and Calibration Dialog."""
+
+    def test_dashboard_quit_requested_signal(
+        self, tmp_path: Path, qapp: QtGui.QGuiApplication
+    ) -> None:
+        from db.manager import DatabaseManager
+        from ui.dashboard import GuidedCalibrationDialog, SessionTrendDashboard
+
+        db_path = str(tmp_path / "test_dash_quit.db")
+        mgr = DatabaseManager(db_path)
+        mgr.initialize_schema()
+
+        dashboard = SessionTrendDashboard(mgr)
+        quit_called = []
+        dashboard.quit_requested.connect(lambda: quit_called.append(True))
+
+        # Click quit button
+        dashboard.btn_quit.click()
+        assert len(quit_called) == 1
+
+        # Test calibration dialog quit shortcut signal
+        calib = GuidedCalibrationDialog()
+        calib_quit_called = []
+        calib.quit_requested.connect(lambda: calib_quit_called.append(True))
+        calib.quit_shortcut.activated.emit()
+        assert len(calib_quit_called) == 1
+
+        dashboard.deleteLater()
+        calib.deleteLater()
+        mgr.close()
