@@ -26,21 +26,36 @@ def set_screen_share_protected(widget: QtWidgets.QWidget) -> bool:
     - Windows: Sets WDA_EXCLUDEFROMCAPTURE (0x00000011)
     """
     if sys.platform == "darwin":
+        # Guard against offscreen platform during headless testing / CI
+        from PySide6 import QtGui
+
+        if QtGui.QGuiApplication.platformName() != "cocoa":
+            return False
+
         try:
             # PyObjC AppKit integration
             import objc
             from AppKit import (
+                NSStatusWindowLevel,
                 NSWindowCollectionBehaviorCanJoinAllSpaces,
                 NSWindowCollectionBehaviorFullScreenAuxiliary,
                 NSWindowCollectionBehaviorIgnoresCycle,
             )
 
             win_id = int(widget.winId())
+            if win_id <= 0x1000:
+                return False
+
             ns_view = objc.objc_object(c_void_p=win_id)
             ns_window = ns_view.window()
             if ns_window is not None:
                 # NSWindowSharingNone = 0
                 ns_window.setSharingType_(0)
+                # CRITICAL: Do NOT hide overlay when another app is focused/active
+                if hasattr(ns_window, "setHidesOnDeactivate_"):
+                    ns_window.setHidesOnDeactivate_(False)
+                # Float above normal application windows
+                ns_window.setLevel_(NSStatusWindowLevel)
                 # Ensure overlay stays visible across virtual desktops and fullscreen apps
                 behavior = (
                     NSWindowCollectionBehaviorCanJoinAllSpaces

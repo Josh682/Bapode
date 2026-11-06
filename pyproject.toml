@@ -13,6 +13,8 @@ authors = [
 ]
 dependencies = [
     "numpy>=1.26.0",
+    "pyobjc-core>=10.0; sys_platform == 'darwin'",
+    "pyobjc-framework-Cocoa>=10.0; sys_platform == 'darwin'",
 ]
 
 [project.optional-dependencies]

@@ -66,6 +66,10 @@ class SystemTrayManager(QtCore.QObject):
         self.set_color_indicator("#10B981", "Bapode: Aktif")
         self.tray_icon.show()
 
+        # State transition tracking for native OS notifications
+        self._prev_ui_level: UIIntrusivenessLevel = UIIntrusivenessLevel.SILENT_OK
+        self._prev_op_mode: OperatingMode = OperatingMode.ACTIVE_MONITORING
+
     def show_startup_notification(self) -> None:
         """Display native OS notification banner confirming app is running in tray."""
         if self.tray_icon.isSystemTrayAvailable():
@@ -121,6 +125,14 @@ class SystemTrayManager(QtCore.QObject):
         if op_mode == OperatingMode.NEEDS_RECALIBRATION:
             self._status_action.setText("Status: Perlu Rekalibrasi")
             self.set_color_indicator("#8B5CF6", "Bapode: Setup Drift")
+            if self._prev_op_mode != OperatingMode.NEEDS_RECALIBRATION:
+                self.tray_icon.showMessage(
+                    "Bapode: Perlu Kalibrasi Ulang",
+                    "Perubahan posisi duduk atau layar terdeteksi. Kalibrasi ulang 3 detik.",
+                    QtWidgets.QSystemTrayIcon.MessageIcon.Warning,
+                    4000,
+                )
+            self._prev_op_mode = op_mode
             return
 
         # Active Monitoring
@@ -139,3 +151,23 @@ class SystemTrayManager(QtCore.QObject):
         elif ui_level == UIIntrusivenessLevel.MICROBREAK_PROMPT:
             self._status_action.setText("Status: Waktu Istirahat (Microbreak)")
             self.set_color_indicator("#3B82F6", "Waktu Peregangan 60s")
+
+        # Native OS banner notification on critical state transitions
+        if ui_level != self._prev_ui_level:
+            if ui_level == UIIntrusivenessLevel.ACTIVE_OVERLAY:
+                self.tray_icon.showMessage(
+                    "Bapode: Peringatan Postur",
+                    "Postur membungkuk (>= 15 detik). Tegakkan kembali posisi duduk Anda.",
+                    QtWidgets.QSystemTrayIcon.MessageIcon.Warning,
+                    4000,
+                )
+            elif ui_level == UIIntrusivenessLevel.MICROBREAK_PROMPT:
+                self.tray_icon.showMessage(
+                    "Bapode: Waktu Peregangan",
+                    "Beban statis berulang terdeteksi. Istirahat sejenak 60 detik.",
+                    QtWidgets.QSystemTrayIcon.MessageIcon.Information,
+                    5000,
+                )
+
+        self._prev_ui_level = ui_level
+        self._prev_op_mode = op_mode

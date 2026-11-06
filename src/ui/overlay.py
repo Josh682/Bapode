@@ -84,16 +84,22 @@ class HUDOverlay(QtWidgets.QWidget):
             self._badge_color = QtGui.QColor("#EF4444")
             self._badge_text = message or "Perbaiki Postur: Kepala Maju / Bahu Merosot"
             self.show()
+            self.raise_()
+            set_screen_share_protected(self)
             self.update()
         elif level == UIIntrusivenessLevel.MICROBREAK_PROMPT:
             self._badge_color = QtGui.QColor("#3B82F6")
             self._badge_text = message or f"Waktu Peregangan ({self._countdown_s}s)"
             self.show()
+            self.raise_()
+            set_screen_share_protected(self)
             self.update()
         elif ui_level_str == "NEEDS_RECALIBRATION":
             self._badge_color = QtGui.QColor("#8B5CF6")
             self._badge_text = message or "Posisi Bergeser — Silakan Rekalibrasi"
             self.show()
+            self.raise_()
+            set_screen_share_protected(self)
             self.update()
             self._auto_hide_timer.start(5000)  # Auto-hide after 5s
         else:

@@ -166,8 +166,28 @@ class TestUIAndPlatformBridge:
 
     def test_system_tray_status_colors(self, qapp: QtWidgets.QApplication) -> None:
         tray = SystemTrayManager()
+        messages: list[tuple[str, str]] = []
+        tray.tray_icon.showMessage = (  # type: ignore[method-assign]
+            lambda title, msg, *args: messages.append((title, msg))
+        )
+
         tray.update_status("ACTIVE_MONITORING", "MEASURABLE", "SILENT_OK")
+        assert len(messages) == 0
+
+        # ACTIVE_OVERLAY transition triggers native notification
         tray.update_status("ACTIVE_MONITORING", "MEASURABLE", "ACTIVE_OVERLAY")
+        assert len(messages) == 1
+        assert "Peringatan Postur" in messages[-1][0]
+
+        # Repeating same level does not spam notification
+        tray.update_status("ACTIVE_MONITORING", "MEASURABLE", "ACTIVE_OVERLAY")
+        assert len(messages) == 1
+
+        # NEEDS_RECALIBRATION transition triggers notification
+        tray.update_status("NEEDS_RECALIBRATION", "UNKNOWN", "SILENT_OK")
+        assert len(messages) == 2
+        assert "Perlu Kalibrasi" in messages[-1][0]
+
         tray.update_status("PAUSED_MANUAL", "PAUSED", "SILENT_OK")
         # Ensure menu actions exist
         assert len(tray.menu.actions()) >= 4
