@@ -439,3 +439,109 @@ class TestTelemetryBuckets:
         assert b.mean_violating_fhp == 1.42
         assert b.mean_violating_slump is None
         assert b.p95_fhp_dev == 1.55
+
+
+class TestThreadSafetyAndNumpyAdaptation:
+    """Test concurrent thread safety and numpy data type compatibility."""
+
+    def test_numpy_types_handling(
+        self, in_memory_db: DatabaseManager, sample_profile: int
+    ) -> None:
+        import numpy as np
+
+        session_id = in_memory_db.create_session()
+        sig = IntervalSignature(
+            visibility_state=VisibilityState.MEASURABLE,
+            ui_level=UIIntrusivenessLevel.ACTIVE_OVERLAY,
+            violations=PostureViolationFlags(v_fhp=True),
+        )
+
+        # Record state with numpy float and int
+        in_memory_db.record_state(
+            session_id=int(session_id),
+            profile_id=sample_profile,
+            signature=sig,
+            now=datetime(2026, 11, 5, 10, 0, 0),
+            alert_dismissal_sec=np.float64(4.25),
+        )
+
+        # Extend interval with numpy dismissal sec
+        in_memory_db.record_state(
+            session_id=int(session_id),
+            profile_id=sample_profile,
+            signature=sig,
+            now=datetime(2026, 11, 5, 10, 0, 10),
+            alert_dismissal_sec=np.float64(5.50),
+        )
+
+        # Update session with numpy metrics
+        in_memory_db.update_session_metrics(
+            session_id=int(session_id),
+            measurable_seconds=np.float64(10.0),
+            adherent_seconds=np.float64(5.0),
+            occluded_lower_seconds=np.float64(0.0),
+            occluded_upper_seconds=np.float64(0.0),
+            absent_seconds=np.float64(0.0),
+            paused_or_drift_seconds=np.float64(0.0),
+            total_alerts_shown=np.int64(1),  # type: ignore[arg-type]
+        )
+
+        session = in_memory_db.get_session(session_id)
+        assert session is not None
+        assert session.measurable_seconds == pytest.approx(10.0)
+
+    def test_concurrent_threads_no_interface_error(
+        self, in_memory_db: DatabaseManager, sample_profile: int
+    ) -> None:
+        import threading
+        import time
+
+        session_id = in_memory_db.create_session()
+        sig = IntervalSignature(
+            visibility_state=VisibilityState.MEASURABLE,
+            ui_level=UIIntrusivenessLevel.SILENT_OK,
+            violations=PostureViolationFlags(),
+        )
+
+        errors: list[Exception] = []
+
+        def worker_writer() -> None:
+            for i in range(100):
+                try:
+                    t = datetime(2026, 11, 5, 10, 0, 0) + timedelta(seconds=i * 0.2)
+                    in_memory_db.record_state(session_id, sample_profile, sig, now=t)
+                except Exception as e:
+                    errors.append(e)
+                time.sleep(0.001)
+
+        def worker_reader() -> None:
+            for _ in range(50):
+                try:
+                    in_memory_db.get_latest_session()
+                    in_memory_db.get_intervals_for_session(session_id)
+                    in_memory_db.get_recent_buckets(session_id, limit=5)
+                except Exception as e:
+                    errors.append(e)
+                time.sleep(0.002)
+
+        def worker_flusher() -> None:
+            for _i in range(10):
+                try:
+                    in_memory_db.flush_current_interval()
+                except Exception as e:
+                    errors.append(e)
+                time.sleep(0.01)
+
+        t1 = threading.Thread(target=worker_writer)
+        t2 = threading.Thread(target=worker_reader)
+        t3 = threading.Thread(target=worker_flusher)
+
+        t1.start()
+        t2.start()
+        t3.start()
+
+        t1.join()
+        t2.join()
+        t3.join()
+
+        assert len(errors) == 0, f"Concurrent thread access resulted in errors: {errors}"

@@ -362,27 +362,22 @@ class SessionTrendDashboard(QtWidgets.QMainWindow):
 
     def refresh_data(self) -> None:
         """Query SQLite WAL and update all views."""
-        conn = self.db_manager.connect()
-        cursor = conn.cursor()
-
-        # Query latest session
-        cursor.execute("SELECT * FROM monitoring_sessions ORDER BY session_id DESC LIMIT 1")
-        row = cursor.fetchone()
-        if row:
-            ref_adh = row["reference_adherence_ratio"] * 100.0
-            cons_bound = row["adherence_conservative_bound"] * 100.0
-            cov = row["observability_coverage"] * 100.0
-            alerts = row["total_alerts_shown"]
+        latest_session = self.db_manager.get_latest_session()
+        if latest_session:
+            ref_adh = latest_session.reference_adherence_ratio * 100.0
+            cons_bound = latest_session.adherence_conservative_bound * 100.0
+            cov = latest_session.observability_coverage * 100.0
+            alerts = latest_session.total_alerts_shown
 
             self.card_ref_adh.value_label.setText(f"{ref_adh:.1f} %")  # type: ignore[attr-defined]
             self.card_cons_bound.value_label.setText(f"{cons_bound:.1f} %")  # type: ignore[attr-defined]
             self.card_coverage.value_label.setText(f"{cov:.1f} %")  # type: ignore[attr-defined]
             self.card_alerts.value_label.setText(f"{alerts} Kali")  # type: ignore[attr-defined]
 
-            m_s = row["measurable_seconds"]
-            occ_s = row["occluded_lower_seconds"] + row["occluded_upper_seconds"]
-            abs_s = row["absent_seconds"]
-            pau_s = row["paused_or_drift_seconds"]
+            m_s = latest_session.measurable_seconds
+            occ_s = latest_session.occluded_lower_seconds + latest_session.occluded_upper_seconds
+            abs_s = latest_session.absent_seconds
+            pau_s = latest_session.paused_or_drift_seconds
 
             self.lbl_measurable.setText(f"Terukur: {m_s:.0f}s")
             self.lbl_occluded.setText(f"Oklusi: {occ_s:.0f}s")
@@ -390,31 +385,23 @@ class SessionTrendDashboard(QtWidgets.QMainWindow):
             self.lbl_paused.setText(f"Dijeda: {pau_s:.0f}s")
 
             # Query buckets
-            session_id = row["session_id"]
-            cursor.execute(
-                """
-                SELECT bucket_timestamp, measurable_sec_in_bucket, duty_cycle_any_violation,
-                       mean_violating_fhp, p95_fhp_dev, mean_violating_neck, mean_violating_slump
-                FROM session_telemetry_buckets
-                WHERE session_id = ?
-                ORDER BY bucket_timestamp DESC LIMIT 20
-                """,
-                (session_id,),
-            )
-            bucket_rows = cursor.fetchall()
-            self.table.setRowCount(len(bucket_rows))
+            if latest_session.session_id is not None:
+                bucket_rows = self.db_manager.get_recent_buckets(
+                    latest_session.session_id, limit=20
+                )
+                self.table.setRowCount(len(bucket_rows))
 
-            for r_idx, b in enumerate(bucket_rows):
-                self.table.setItem(r_idx, 0, QtWidgets.QTableWidgetItem(str(b[0])))
-                self.table.setItem(r_idx, 1, QtWidgets.QTableWidgetItem(f"{b[1]:.0f}s"))
-                self.table.setItem(r_idx, 2, QtWidgets.QTableWidgetItem(f"{b[2] * 100.0:.1f}%"))
-                fhp_str = f"{b[3]:.3f}" if b[3] is not None else "—"
-                self.table.setItem(r_idx, 3, QtWidgets.QTableWidgetItem(fhp_str))
-                self.table.setItem(r_idx, 4, QtWidgets.QTableWidgetItem(f"{b[4]:.3f}"))
-                neck_str = f"{b[5]:.3f}" if b[5] is not None else "—"
-                self.table.setItem(r_idx, 5, QtWidgets.QTableWidgetItem(neck_str))
-                slump_str = f"{b[6]:.3f}" if b[6] is not None else "—"
-                self.table.setItem(r_idx, 6, QtWidgets.QTableWidgetItem(slump_str))
+                for r_idx, b in enumerate(bucket_rows):
+                    self.table.setItem(r_idx, 0, QtWidgets.QTableWidgetItem(str(b[0])))
+                    self.table.setItem(r_idx, 1, QtWidgets.QTableWidgetItem(f"{b[1]:.0f}s"))
+                    self.table.setItem(r_idx, 2, QtWidgets.QTableWidgetItem(f"{b[2] * 100.0:.1f}%"))
+                    fhp_str = f"{b[3]:.3f}" if b[3] is not None else "—"
+                    self.table.setItem(r_idx, 3, QtWidgets.QTableWidgetItem(fhp_str))
+                    self.table.setItem(r_idx, 4, QtWidgets.QTableWidgetItem(f"{b[4]:.3f}"))
+                    neck_str = f"{b[5]:.3f}" if b[5] is not None else "—"
+                    self.table.setItem(r_idx, 5, QtWidgets.QTableWidgetItem(neck_str))
+                    slump_str = f"{b[6]:.3f}" if b[6] is not None else "—"
+                    self.table.setItem(r_idx, 6, QtWidgets.QTableWidgetItem(slump_str))
 
     def update_live_telemetry(self, data: dict[str, Any]) -> None:
         """Update live telemetry tab with real-time deviations and thresholds."""

@@ -9,7 +9,6 @@ Implements:
 """
 
 import queue
-import time
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -131,13 +130,9 @@ class DatabaseWorker(QtCore.QThread):
 
     def run(self) -> None:
         """Main loop: dequeue tasks and commit transactions."""
-        last_flush_time = time.monotonic()
-
         while self._running:
             try:
-                # Wait for task with timeout to service periodic 15s flush
-                timeout = max(0.1, self.flush_interval_s - (time.monotonic() - last_flush_time))
-                task = self._task_queue.get(timeout=timeout)
+                task = self._task_queue.get(timeout=0.5)
                 self._handle_task(task)
                 self._task_queue.task_done()
                 if isinstance(task, StopTask):
@@ -146,15 +141,6 @@ class DatabaseWorker(QtCore.QThread):
                 pass
             except Exception as e:
                 self.error_occurred.emit(str(e))
-
-            # Periodic 15s flush check
-            now_mono = time.monotonic()
-            if now_mono - last_flush_time >= self.flush_interval_s:
-                try:
-                    self.db_manager.flush_current_interval()
-                except Exception as e:
-                    self.error_occurred.emit(str(e))
-                last_flush_time = now_mono
 
         # Drain remaining tasks upon shutdown
         self._drain_queue()

@@ -454,7 +454,7 @@ class SessionOrchestrator:
                 elif self.overlay_active_start is not None:
                     # Overlay extinguished! Record latency if recovered (all V_i == 0)
                     if not flags.has_any_violation:
-                        dismissal_sec = max(0.0, t_sec - self.overlay_active_start)
+                        dismissal_sec = max(0.0, float(t_sec - self.overlay_active_start))
                         self.alert_dismissals.append(dismissal_sec)
                         last_dismissal_sec = dismissal_sec
                     self.overlay_active_start = None

@@ -275,17 +275,25 @@ class VisionTrackerWorker(QtCore.QThread):
                     dt,
                 )
 
-            snapshot = self.orchestrator.process_frame(
-                pose=pose_data if vis_state == VisibilityState.MEASURABLE else None,
-                face=primary_face
-                if vis_state in (VisibilityState.MEASURABLE, VisibilityState.OCCLUDED_LOWER)
-                else None,
-                visibility=vis_state,
-                is_moving=is_moving,
-                dt=dt,
-                current_time_s=current_mono,
-                now=datetime.now(),
-            )
+            try:
+                snapshot = self.orchestrator.process_frame(
+                    pose=pose_data if vis_state == VisibilityState.MEASURABLE else None,
+                    face=primary_face
+                    if vis_state in (VisibilityState.MEASURABLE, VisibilityState.OCCLUDED_LOWER)
+                    else None,
+                    visibility=vis_state,
+                    is_moving=is_moving,
+                    dt=dt,
+                    current_time_s=current_mono,
+                    now=datetime.now(),
+                )
+            except Exception as e:
+                import logging
+
+                logging.getLogger("bapode.vision").error(
+                    f"Error processing frame in vision worker: {e}", exc_info=True
+                )
+                continue
 
             # Emit state changes
             self.state_changed.emit(
