@@ -55,7 +55,7 @@ Untuk mencegah ledakan kombinasi *state* akibat pencampuran status kamera dan st
 ### Sumbu 2: `VisibilityState` (Matriks $2 \times 2$ Wajah $\times$ Bahu)
 Hanya dievaluasi ketika `OperatingMode == ACTIVE_MONITORING`:
 - `MEASURABLE` (**Wajah Terdeteksi, Bahu Terdeteksi**): Kelima metrik postur dievaluasi penuh.
-- `OCCLUDED_LOWER` (**Wajah Terdeteksi, Bahu Hilang**): Bahu keluar dari tepi bawah layar atau tertutup tangan. Evaluasi metrik berbasis bahu ditangguhkan; namun jika rasio lebar mata $W_{\text{eye\_corr}} / W_{\text{eye, base}} \gt 1.30$ bertahan $\ge 15\text{ detik}$, sistem memicu peringatan `EXTREME_CLOSE_PROXIMITY`.
+- `OCCLUDED_LOWER` (**Wajah Terdeteksi, Bahu Hilang**): Bahu keluar dari tepi bawah layar atau tertutup tangan. Evaluasi metrik berbasis bahu ditangguhkan; namun jika rasio lebar mata $W_{\text{eye-corr}} / W_{\text{eye, base}} \gt 1.30$ bertahan $\ge 15\text{ detik}$, sistem memicu peringatan `EXTREME_CLOSE_PROXIMITY`.
 - `OCCLUDED_UPPER` (**Wajah Hilang, Bahu Terdeteksi**): Pengguna masih di kursi tetapi wajah gagal dideteksi (misal menunduk sangat curam menatap ponsel di pangkuan, minum, atau wajah tertutup tangan). Dicatat sebagai waktu tidak terukur (`occluded_upper_seconds`).
 - `ABSENT` (**Wajah Hilang, Bahu Hilang**): Pengguna meninggalkan meja kerja.
 

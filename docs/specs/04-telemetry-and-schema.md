@@ -7,9 +7,9 @@
    Pada agregasi *bucket* 5 menit (`session_telemetry_buckets`), rata-rata tingkat keparahan deviasi (`mean_violating_*`) **hanya dihitung dari sampel ketika metrik tersebut sedang melanggar ($V_i == 1$)**, didampingi oleh nilai persentil ke-95 (`p95_*`) dari seluruh sampel `MEASURABLE` di dalam *bucket*.Jika tidak ada pelanggaran selama 5 menit tersebut, kolom `mean_violating_*` bernilai `NULL`.
 2. **Batas Kepatuhan Terhadap Oklusi (*Observability & Adherence Bounds*):**
    Pada tabel `monitoring_sessions`, sistem wajib memperbarui tiga rasio utama:
-   - $$\text{observability\_coverage} = \frac{T_{\text{measurable}}}{T_{\text{measurable}} + T_{\text{occluded\_lower}} + T_{\text{occluded\_upper}}}$$
-   - $$\text{reference\_adherence\_ratio} = \frac{T_{\text{adherent}}}{T_{\text{measurable}}}$$
-   - $$\text{adherence\_conservative\_bound} = \frac{T_{\text{adherent}}}{T_{\text{measurable}} + T_{\text{occluded\_lower}} + T_{\text{occluded\_upper}}}$$
+   - $$\text{observability-coverage} = \frac{T_{\text{measurable}}}{T_{\text{measurable}} + T_{\text{occluded-lower}} + T_{\text{occluded-upper}}}$$
+   - $$\text{reference-adherence-ratio} = \frac{T_{\text{adherent}}}{T_{\text{measurable}}}$$
+   - $$\text{adherence-conservative-bound} = \frac{T_{\text{adherent}}}{T_{\text{measurable}} + T_{\text{occluded-lower}} + T_{\text{occluded-upper}}}$$
 3. **Run-Length Encoding (RLE) pada `posture_state_intervals`:**
    Jangan menyimpan baris *database* setiap *frame* ($5\text{ FPS}$). Simpan satu baris interval setiap kali terjadi perubahan kombinasi `(visibility_state, ui_level, v_fhp, v_neck_comp, v_slump, v_gaze_pitch, v_tilt)` atau perbarui `ended_at` dan `duration_seconds` dari interval yang sedang berjalan setiap siklus *flush* $15\text{ detik}$.
 

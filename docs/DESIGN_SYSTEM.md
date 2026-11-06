@@ -29,7 +29,7 @@ Pengguna aplikasi ini sedang mengetik kode, menulis dokumen, atau mengikuti rapa
 - Menampilkan pratinjau *webcam* dengan siluet pemandu bahu dan kepala di tengah layar.
 - Menampilkan indikator kelayakan *real-time* sebelum dan selama $3\text{ detik}$ ($15\text{ sampel}$):
   - Jika sudut kepala/bahu miring atau rasio leher-bahu di luar $[0.35,\; 0.75]$, bingkai pemandu berwarna kuning dengan teks instruksi spesifik (misal: *"Luruskan pandangan ke tengah layar"*).
-  - Jika simpangan baku *noise* $4\hat{\sigma}_{i,0} \gt 0.8 \cdot \tau_{\text{default\_enter}, i}$, tampilkan peringatan: *"Pencahayaan terlalu redup atau posisi belum stabil"*.
+  - Jika simpangan baku *noise* $4\hat{\sigma}_{i,0} \gt 0.8 \cdot \tau_{\text{default-enter}, i}$, tampilkan peringatan: *"Pencahayaan terlalu redup atau posisi belum stabil"*.
 
 ## 5. Aturan Visualisasi Dashboard Statistik (`src/ui/dashboard.py`)
 1. **Pelaporan Jujur Terhadap Oklusi:**

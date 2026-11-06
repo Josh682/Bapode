@@ -29,7 +29,7 @@ Berbeda dari aplikasi pengingat postur konvensional yang sering mengganggu fokus
 ### 🧠 Computer Vision & 5 Metrik Geometris Satu Arah
 Memanfaatkan **MediaPipe Pose Landmarker (Lite)** dan **MediaPipe Face Landmarker** pada laju efisien daya $5\text{ FPS}$ ($\Delta t \approx 200\text{ ms}$):
 * **HEAD_FORWARD_SCALE ($d_{\text{fhp}}$):** Mengukur kecenderungan kepala maju (*Forward Head Posture*) melalui rasio biokular terhadap lebar bahu dengan kompensasi sudut putar kepala (*yaw*).
-* **TORSO_NECK_COMPRESSION ($d_{\text{neck}}$):** Mengukur leher yang melorot/tertekan terhadap garis bahu menggunakan proyeksi ortogonal ($L_{\text{neck\_ort}}$) yang kebal terhadap kemiringan bahu (*shoulder roll*).
+* **TORSO_NECK_COMPRESSION ($d_{\text{neck}}$):** Mengukur leher yang melorot/tertekan terhadap garis bahu menggunakan proyeksi ortogonal ($L_{\text{neck-ort}}$) yang kebal terhadap kemiringan bahu (*shoulder roll*).
 * **SHOULDER_VERTICAL_DROP ($d_{\text{slump}}$):** Mendeteksi punggung membungkuk (*slouching/slumping*) dengan koreksi perspektif optik $S_w(t) = W_{\text{sh}}(t) / W_{\text{sh,base}}$ agar tidak memicu alarm palsu saat tubuh condong maju secara wajar.
 * **GAZE_DOWN_PITCH ($d_{\text{pitch}}$):** Memantau sudut menunduk berlebih ke arah bawah laptop.
 * **CORONAL_ASYMMETRY ($d_{\text{tilt}}$):** Mendeteksi kemiringan bahu atau kepala asimetris ke kiri/kanan.

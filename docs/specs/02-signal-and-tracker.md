@@ -17,7 +17,7 @@ $$\hat{d}_{i,k} = \alpha_k d_{i,k}^{\text{med}} + (1 - \alpha_k)\hat{d}_{i,k-1}$
 ### 1.3. Detektor Gerakan Kuasi-Statis (*Normalized Velocity Signal*)
 Kecepatan gerak dihitung dari perubahan koordinat bahu yang telah dihaluskan, dinormalisasi terhadap lebar bahu saat ini $W_{\text{sh}}(t_k)$ dan selang waktu nyata $\Delta t_k$:
 
-$$v_{\text{norm}}(t_k) = \frac{1}{\Delta t_k W_{\text{sh}}(t_k)} \max\left(|\Delta \hat{Y}_{\text{sh\_mid}}|,\; |\Delta \hat{X}_{\text{sh\_mid}}|,\; |\Delta \hat{W}_{\text{sh}}|\right)$$
+$$v_{\text{norm}}(t_k) = \frac{1}{\Delta t_k W_{\text{sh}}(t_k)} \max\left(|\Delta \hat{Y}_{\text{sh-mid}}|,\; |\Delta \hat{X}_{\text{sh-mid}}|,\; |\Delta \hat{W}_{\text{sh}}|\right)$$
 
 Status gerakan dinamis `moving = True` aktif apabila $v_{\text{norm}}(t_k) \gt v_{\text{thresh}}$ (nilai *default* $v_{\text{thresh}} = 0.15\text{ lebar-bahu/detik}$).
 
