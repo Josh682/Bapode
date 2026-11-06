@@ -1,4 +1,4 @@
-# Posture Guardian (v3.0 Daily-Use Production)
+# Bad Posture Detector
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Qt 6 / PySide6](https://img.shields.io/badge/GUI-PySide6%20Qt6-green.svg)](https://wiki.qt.io/Qt_for_Python)
@@ -10,22 +10,10 @@
 
 ---
 
-## Daftar Isi
-1. [1. Ini Aplikasi Apa?](#1-ini-aplikasi-apa)
-2. [2. Fitur-Fitur Utama](#2-fitur-fitur-utama)
-3. [3. Cara Menjalankan](#3-cara-menjalankan)
-4. [4. Batasan Produk & Desain](#4-batasan-produk--desain)
-5. [5. Arsitektur Multi-Threading](#5-arsitektur-multi-threading)
-6. [6. Konfigurasi Parameter (config.toml)](#6-konfigurasi-parameter-configtoml)
-7. [7. Pengujian & Verifikasi Mandiri](#7-pengujian--verifikasi-mandiri)
+## 1. About this app
+**Bad Posture Detector** dirancang untuk para pekerja komputer harian—programmer, penulis, desainer, dan pekerja profesional—yang menghabiskan waktu berjam-jam duduk di depan laptop atau monitor komputer.
 
----
-
-## 1. Ini Aplikasi Apa?
-
-**Posture Guardian** dirancang untuk para pekerja komputer harian—programmer, penulis, desainer, dan pekerja profesional—yang menghabiskan waktu berjam-jam duduk di depan laptop atau monitor komputer.
-
-Berbeda dari aplikasi pengingat postur konvensional yang sering mengganggu fokus kerja dengan *popup* berisik atau kalkulasi sudut yang tidak realistis, Posture Guardian dibangun di atas prinsip:
+Berbeda dari aplikasi pengingat postur konvensional yang sering mengganggu fokus kerja dengan *popup* berisik atau kalkulasi sudut yang tidak realistis, Bad Posture Detector dibangun di atas prinsip:
 
 1. **Non-Intrusive & Anti-Focus-Stealing:**  
    Aplikasi tinggal dengan tenang di **Menu Bar macOS / System Tray Windows**. Peringatan visual (HUD Overlay) dirancang **tembus-klik (*click-through*)**, **tidak pernah mencuri fokus ketikan (*keyboard focus*)**, dan **otomatis tidak terlihat saat membagikan layar (*screen-sharing safe*)** di Google Meet, Zoom, atau Teams.
@@ -158,7 +146,7 @@ Agar ekspektasi pengguna tetap selaras dengan tujuan rancangan sistem:
 
 ## 5. Arsitektur Multi-Threading
 
-Untuk menjamin antarmuka pengguna tidak pernah *freeze* atau *stutter*, Posture Guardian memisahkan beban kerja ke dalam 4 *thread* terpisah:
+Untuk menjamin antarmuka pengguna tidak pernah *freeze* atau *stutter*, Bad Posture Detector memisahkan beban kerja ke dalam 4 *thread* terpisah:
 
 ```mermaid
 flowchart TB
