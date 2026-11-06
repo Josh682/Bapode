@@ -1,4 +1,4 @@
-"""Pytest configuration and global environment fixtures for Posture Guardian."""
+"""Pytest configuration and global environment fixtures for Bapode."""
 
 from __future__ import annotations
 

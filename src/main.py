@@ -1,4 +1,4 @@
-"""Application Entry Point and 4-Thread Coordinator for Posture Guardian v3.0.
+"""Application Entry Point and 4-Thread Coordinator for Bapode v3.0.
 
 Reference: docs/ARCHITECTURE.md & docs/DESIGN_SYSTEM.md
 Coordinates:
@@ -25,12 +25,12 @@ from vision.detector import SequentialLandmarkDetector
 from vision.worker import VisionTrackerWorker
 
 
-class PostureGuardianApp(QtCore.QObject):
-    """Main application lifecycle and cross-thread coordinator."""
+class BapodeApp(QtCore.QObject):
+    """Main application lifecycle and cross-thread coordinator for Bapode."""
 
     def __init__(
         self,
-        db_path: str = "posture_guardian.db",
+        db_path: str = "bapode.db",
         camera_index: int = 0,
         mock_camera: bool = False,
         headless: bool = False,
@@ -150,7 +150,7 @@ class PostureGuardianApp(QtCore.QObject):
 
         if not self.headless and not self.calibrate_thresholds:
             print("\n" + "=" * 80)
-            print(" Posture Guardian v3.0 Berjalan di Latar Belakang (Background Utility)")
+            print(" Bapode v3.0 Berjalan di Latar Belakang (Background Utility)")
             print("=" * 80)
             print(" • Status Icon : Periksa Menu Bar macOS di pojok kanan atas (lingkaran hijau)")
             print(" • Menu Aksi   : Klik ikon Menu Bar untuk:")
@@ -171,7 +171,7 @@ class PostureGuardianApp(QtCore.QObject):
         if getattr(self, "_is_shutting_down", False):
             return
         self._is_shutting_down = True
-        print("[Posture Guardian] Menghentikan seluruh background worker dan mem-flush database...")
+        print("[Bapode] Menghentikan seluruh background worker dan mem-flush database...")
 
         # 1. Stop camera reader
         self.camera_reader.stop()
@@ -191,7 +191,7 @@ class PostureGuardianApp(QtCore.QObject):
         app = QtWidgets.QApplication.instance()
         if app is not None:
             app.quit()
-        print("[Posture Guardian] Shutdown selesai. Selamat beristirahat!")
+        print("[Bapode] Shutdown selesai. Selamat beristirahat!")
 
     def _render_live_terminal_telemetry(self, data: dict[str, Any]) -> None:
         """Render ANSI live telemetry terminal screen for empirical threshold tuning (Bab 8)."""
@@ -210,7 +210,7 @@ class PostureGuardianApp(QtCore.QObject):
         out = [
             "\033[H\033[2J",
             "=" * 80,
-            " Posture Guardian v3.0 — Live Telemetry & Threshold Tuning (Bab 8)",
+            " Bapode v3.0 — Live Telemetry & Threshold Tuning (Bab 8)",
             f" Mode: {mode:<18} | Visibility: {vis:<14} | UI Level: {ui}",
             f" Gerak: {'MOVING' if moving else 'STATIONARY':<10} | v_norm: {v_norm:.3f}",
             "=" * 80,
@@ -258,15 +258,19 @@ class PostureGuardianApp(QtCore.QObject):
         sys.stdout.flush()
 
 
+# Backward-compatibility alias
+PostureGuardianApp = BapodeApp
+
+
 def main() -> int:
     """CLI bootstrap and entry point."""
-    parser = argparse.ArgumentParser(description="Posture Guardian v3.0 Desktop Application")
+    parser = argparse.ArgumentParser(description="Bapode v3.0 Desktop Application")
     parser.add_argument(
         "--mock-camera", action="store_true", help="Run with synthetic camera frames"
     )
     parser.add_argument("--camera-index", type=int, default=0, help="UVC Camera device index")
     parser.add_argument(
-        "--db-path", type=str, default="posture_guardian.db", help="SQLite database path"
+        "--db-path", type=str, default="bapode.db", help="SQLite database path"
     )
     parser.add_argument("--headless", action="store_true", help="Run headless without GUI")
     parser.add_argument(
@@ -297,7 +301,7 @@ def main() -> int:
     if isinstance(app, QtWidgets.QApplication):
         app.setQuitOnLastWindowClosed(False)
 
-    coordinator = PostureGuardianApp(
+    coordinator = BapodeApp(
         db_path=args.db_path,
         camera_index=args.camera_index,
         mock_camera=args.mock_camera,

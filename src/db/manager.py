@@ -1,4 +1,4 @@
-"""SQLite Database Manager and RLE Interval Storage for Posture Guardian v3.0.
+"""SQLite Database Manager and RLE Interval Storage for Bapode v3.0.
 
 Reference: docs/specs/04-telemetry-and-schema.md & docs/ARCHITECTURE.md
 Enforces:
@@ -109,7 +109,7 @@ class TelemetryBucketRecord:
 
 
 class DatabaseManager:
-    """SQLite WAL database manager for Posture Guardian telemetry."""
+    """SQLite WAL database manager for Bapode telemetry."""
 
     def __init__(self, db_path: str | Path = ":memory:") -> None:
         self.db_path = str(db_path)

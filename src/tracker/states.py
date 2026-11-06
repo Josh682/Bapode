@@ -1,4 +1,4 @@
-"""Orthogonal 3-Axis State Architecture for Posture Guardian.
+"""Orthogonal 3-Axis State Architecture for Bapode.
 
 Reference: docs/ARCHITECTURE.md
 Decomposes system conditions into 3 independent orthogonal axes:

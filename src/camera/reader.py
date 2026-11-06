@@ -1,4 +1,4 @@
-"""Camera Capture Worker (Thread 3) for Posture Guardian.
+"""Camera Capture Worker (Thread 3) for Bapode.
 
 Reference: docs/specs/01-vision-and-metrics.md & docs/ARCHITECTURE.md
 Implements:

@@ -1,4 +1,4 @@
-"""Webcam and MediaPipe Tasks Smoke Test for Posture Guardian v3.0.
+"""Webcam and MediaPipe Tasks Smoke Test for Bapode v3.0.
 
 Captures frames from physical UVC webcam for 10 seconds at 5 FPS (50 frames),
 runs sequential Pose Lite and Face Landmarker Tasks (.task models),
@@ -25,7 +25,6 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from scripts.download_models import ensure_models_exist  # noqa: E402
-
 from vision.detector import SequentialLandmarkDetector  # noqa: E402
 from vision.metrics import CalibrationReference, calculate_posture_metrics  # noqa: E402
 
@@ -37,7 +36,7 @@ def run_smoke_test(
 ) -> int:
     """Run real camera acquisition and MediaPipe Tasks extraction test."""
     print("=" * 80)
-    print(" Posture Guardian v3.0 — Physical Webcam & MediaPipe Tasks Smoke Test")
+    print(" Bapode v3.0 — Physical Webcam & MediaPipe Tasks Smoke Test")
     print("=" * 80)
 
     # 1. Ensure models exist
@@ -224,7 +223,7 @@ def run_smoke_test(
     print("-" * 80)
     if frames_captured >= 10 and avg_latency < 200.0:
         print(" VERDIK: [PASS] KAMERA, MODEL .TASK, & 5 METRIK BERJALAN SEMPURNA!")
-        print(" Posture Guardian v3.0 SIAP DIGUNAKAN HARIAN.")
+        print(" Bapode v3.0 SIAP DIGUNAKAN HARIAN.")
         print("=" * 80)
         return 0
     else:

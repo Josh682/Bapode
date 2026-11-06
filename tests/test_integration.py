@@ -23,7 +23,7 @@ from PySide6 import QtCore, QtWidgets
 from camera.reader import CameraReader
 from db.manager import CalibrationProfileRecord, DatabaseManager
 from db.worker import DatabaseWorker
-from main import PostureGuardianApp
+from main import BapodeApp
 from tracker.states import (
     IntervalSignature,
     PostureViolationFlags,
@@ -180,7 +180,7 @@ class TestEndToEndPipeline:
         self, tmp_path: Path, qapp: QtWidgets.QApplication
     ) -> None:
         db_path = str(tmp_path / "e2e_full.db")
-        app_coord = PostureGuardianApp(
+        app_coord = BapodeApp(
             db_path=db_path,
             mock_camera=True,
             headless=True,

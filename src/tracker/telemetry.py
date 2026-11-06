@@ -1,4 +1,4 @@
-"""Session Orchestrator and Non-Diluted Telemetry Accumulator for Posture Guardian v3.0.
+"""Session Orchestrator and Non-Diluted Telemetry Accumulator for Bapode v3.0.
 
 Reference: docs/specs/04-telemetry-and-schema.md & docs/ARCHITECTURE.md
 Implements:

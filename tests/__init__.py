@@ -1,1 +1,1 @@
-"""Test suite for Posture Guardian."""
+"""Test suite for Bapode."""

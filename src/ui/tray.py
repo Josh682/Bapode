@@ -63,14 +63,14 @@ class SystemTrayManager(QtCore.QObject):
         self.tray_icon.setContextMenu(self.menu)
 
         # Initial icon
-        self.set_color_indicator("#10B981", "Posture Guardian: Aktif")
+        self.set_color_indicator("#10B981", "Bapode: Aktif")
         self.tray_icon.show()
 
     def show_startup_notification(self) -> None:
         """Display native OS notification banner confirming app is running in tray."""
         if self.tray_icon.isSystemTrayAvailable():
             self.tray_icon.showMessage(
-                "Posture Guardian v3.0",
+                "Bapode v3.0",
                 "Aplikasi aktif memantau di Menu Bar (kanan atas). Klik ikon untuk opsi.",
                 QtWidgets.QSystemTrayIcon.MessageIcon.Information,
                 3000,
@@ -108,19 +108,19 @@ class SystemTrayManager(QtCore.QObject):
 
         if op_mode == OperatingMode.PAUSED_MANUAL:
             self._status_action.setText("Status: Dijeda Manual (Snooze)")
-            self.set_color_indicator("#6B7280", "Posture Guardian: Dijeda Manual")
+            self.set_color_indicator("#6B7280", "Bapode: Dijeda Manual")
             return
         if op_mode == OperatingMode.PAUSED_MEETING_AUTO:
             self._status_action.setText("Status: Dijeda (Rapat Fullscreen)")
-            self.set_color_indicator("#6B7280", "Posture Guardian: Mode Rapat")
+            self.set_color_indicator("#6B7280", "Bapode: Mode Rapat")
             return
         if op_mode == OperatingMode.CALIBRATING:
             self._status_action.setText("Status: Sedang Kalibrasi...")
-            self.set_color_indicator("#8B5CF6", "Posture Guardian: Kalibrasi")
+            self.set_color_indicator("#8B5CF6", "Bapode: Kalibrasi")
             return
         if op_mode == OperatingMode.NEEDS_RECALIBRATION:
             self._status_action.setText("Status: Perlu Rekalibrasi")
-            self.set_color_indicator("#8B5CF6", "Posture Guardian: Setup Drift")
+            self.set_color_indicator("#8B5CF6", "Bapode: Setup Drift")
             return
 
         # Active Monitoring

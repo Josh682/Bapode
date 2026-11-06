@@ -1,4 +1,4 @@
-"""IssueTracker and UI Escalation Controller for Posture Guardian.
+"""IssueTracker and UI Escalation Controller for Bapode.
 
 Reference: docs/specs/02-signal-and-tracker.md & docs/ARCHITECTURE.md
 Implements:

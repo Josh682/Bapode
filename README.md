@@ -1,19 +1,19 @@
-# Bad Posture Detector
+# Bapode (v3.0 Daily-Use Production)
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Qt 6 / PySide6](https://img.shields.io/badge/GUI-PySide6%20Qt6-green.svg)](https://wiki.qt.io/Qt_for_Python)
 [![MediaPipe Tasks](https://img.shields.io/badge/AI-MediaPipe%20Tasks-orange.svg)](https://developers.google.com/mediapipe)
-[![Tests Passing](https://img.shields.io/badge/tests-73%20passed-brightgreen.svg)]()
+[![Tests Passing](https://img.shields.io/badge/tests-74%20passed-brightgreen.svg)]()
 [![Code Style: Ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 
 > Aplikasi utilitas desktop harian (*daily-use personal utility*) berbasis webcam monokuler yang memantau kepatuhan postur tubuh relatif terhadap referensi personal dan paparan beban statis secara **100% on-device, sadar-privasi, dan non-intrusive**.
 
 ---
 
-## 1. About this app
-**Bad Posture Detector** dirancang untuk para pekerja komputer harian—programmer, penulis, desainer, dan pekerja profesional—yang menghabiskan waktu berjam-jam duduk di depan laptop atau monitor komputer.
+## 1. Ini Aplikasi Apa?
+**Bapode** dirancang untuk para pekerja komputer harian—programmer, penulis, desainer, dan pekerja profesional—yang menghabiskan waktu berjam-jam duduk di depan laptop atau monitor komputer.
 
-Berbeda dari aplikasi pengingat postur konvensional yang sering mengganggu fokus kerja dengan *popup* berisik atau kalkulasi sudut yang tidak realistis, Bad Posture Detector dibangun di atas prinsip:
+Berbeda dari aplikasi pengingat postur konvensional yang sering mengganggu fokus kerja dengan *popup* berisik atau kalkulasi sudut yang tidak realistis, Bapode dibangun di atas prinsip:
 
 1. **Non-Intrusive & Anti-Focus-Stealing:**  
    Aplikasi tinggal dengan tenang di **Menu Bar macOS / System Tray Windows**. Peringatan visual (HUD Overlay) dirancang **tembus-klik (*click-through*)**, **tidak pernah mencuri fokus ketikan (*keyboard focus*)**, dan **otomatis tidak terlihat saat membagikan layar (*screen-sharing safe*)** di Google Meet, Zoom, atau Teams.
@@ -146,7 +146,7 @@ Agar ekspektasi pengguna tetap selaras dengan tujuan rancangan sistem:
 
 ## 5. Arsitektur Multi-Threading
 
-Untuk menjamin antarmuka pengguna tidak pernah *freeze* atau *stutter*, Bad Posture Detector memisahkan beban kerja ke dalam 4 *thread* terpisah:
+Untuk menjamin antarmuka pengguna tidak pernah *freeze* atau *stutter*, Bapode memisahkan beban kerja ke dalam 4 *thread* terpisah:
 
 ```mermaid
 flowchart TB

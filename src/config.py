@@ -1,4 +1,4 @@
-"""Configuration Loader for Posture Guardian v3.0.
+"""Configuration Loader for Bapode v3.0.
 
 Loads parameters from `config.toml` (or falls back to built-in defaults)
 using standard library `tomllib`.

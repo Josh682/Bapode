@@ -3,13 +3,13 @@ requires = ["setuptools>=68.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "posture-guardian"
+name = "bapode"
 version = "3.0.0"
 description = "Monocular webcam-based non-intrusive posture compliance and static load monitor"
-readme = "AGENTS.md"
+readme = "README.md"
 requires-python = ">=3.11"
 authors = [
-    { name = "Posture Guardian Team" }
+    { name = "Bapode Team" }
 ]
 dependencies = [
     "numpy>=1.26.0",

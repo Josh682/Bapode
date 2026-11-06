@@ -121,7 +121,7 @@ class SessionTrendDashboard(QtWidgets.QMainWindow):
     ) -> None:
         super().__init__(parent)
         self.db_manager = db_manager
-        self.setWindowTitle("Posture Guardian — Dashboard Sesi & Tren")
+        self.setWindowTitle("Bapode — Dashboard Sesi & Tren")
         self.resize(880, 640)
         self._init_ui()
 
@@ -133,7 +133,7 @@ class SessionTrendDashboard(QtWidgets.QMainWindow):
         # Native Menu Bar with Quit action (Cmd+Q)
         menu_bar = self.menuBar()
         app_menu = menu_bar.addMenu("Aplikasi")
-        quit_action = app_menu.addAction("Keluar Posture Guardian")
+        quit_action = app_menu.addAction("Keluar Bapode")
         quit_action.setShortcut(QtGui.QKeySequence.StandardKey.Quit)
         quit_action.triggered.connect(self.quit_requested.emit)
 
@@ -483,7 +483,7 @@ class SessionTrendDashboard(QtWidgets.QMainWindow):
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:  # noqa: N802
         """Handle window close event without terminating background tracking."""
         print(
-            "\n[Posture Guardian] Jendela Dashboard ditutup. "
+            "\n[Bapode] Jendela Dashboard ditutup. "
             "Aplikasi tetap memantau di latar belakang (Menu Bar macOS kanan atas).\n"
             "  • Untuk keluar aplikasi: Tekan Cmd+Q, klik tombol 'Keluar' pada Menu Bar, "
             "atau tekan Ctrl+C di terminal.\n"

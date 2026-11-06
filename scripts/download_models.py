@@ -1,4 +1,4 @@
-"""Model Downloader for Posture Guardian MediaPipe Tasks.
+"""Model Downloader for Bapode MediaPipe Tasks.
 
 Downloads the official Google MediaPipe task models:
 - pose_landmarker_lite.task (~9.1 MB)
@@ -36,7 +36,7 @@ def download_file_with_progress(url: str, dest_path: Path) -> None:
 
     req = urllib.request.Request(
         url,
-        headers={"User-Agent": "PostureGuardian-ModelDownloader/3.0"},
+        headers={"User-Agent": "Bapode-ModelDownloader/3.0"},
     )
 
     start_time = time.time()
@@ -102,7 +102,7 @@ def ensure_models_exist(models_dir: str | Path = "models") -> tuple[Path, Path]:
 def main() -> int:
     """CLI runner to download models manually."""
     parser = argparse.ArgumentParser(
-        description="Unduh file model MediaPipe Task untuk Posture Guardian v3.0"
+        description="Unduh file model MediaPipe Task untuk Bapode v3.0"
     )
     parser.add_argument(
         "--models-dir",

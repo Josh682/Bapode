@@ -1,1 +1,1 @@
-"""Scripts package for Posture Guardian."""
+"""Scripts package for Bapode."""

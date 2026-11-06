@@ -1,4 +1,4 @@
-"""Operating System Abstraction Bridge for Posture Guardian.
+"""Operating System Abstraction Bridge for Bapode.
 
 Reference: docs/DESIGN_SYSTEM.md & docs/ARCHITECTURE.md
 Implements:

@@ -1,7 +1,7 @@
-# AGENTS.md — Posture Guardian (v3.0 Daily-Use Production)
+# AGENTS.md — Bapode (v3.0 Daily-Use Production)
 
 ## 1. Identitas & Batasan Produk
-**Posture Guardian** adalah aplikasi utilitas desktop harian (*daily-use personal utility*) berbasis kamera *webcam* monokuler yang memantau **kepatuhan postur relatif terhadap referensi personal** dan **paparan beban statis** secara $100\%$ *on-device*, sadar-privasi, dan *non-intrusive*.
+**Bapode** adalah aplikasi utilitas desktop harian (*daily-use personal utility*) berbasis kamera *webcam* monokuler yang memantau **kepatuhan postur relatif terhadap referensi personal** dan **paparan beban statis** secara $100\%$ *on-device*, sadar-privasi, dan *non-intrusive*.
 - **Bukan Alat Klinis:** Aplikasi tidak mengukur sudut ortopedi absolut (seperti *Craniovertebral Angle* klinis), melainkan menghitung deviasi relatif $d_i(t)$ terhadap *baseline* kalibrasi 3 detik pengguna.
 - **Prinsip Anti-Nagging:** Mengizinkan gerakan dinamis singkat, menerapkan *one-way velocity gate*, *cooldown* peringatan visual ($30\text{ detik}$), serta mengeskalasi pelanggaran berulang menjadi pengingat *micro-break*.
 
@@ -14,7 +14,7 @@
 
 ## 3. Struktur Direktori Standar
 ```text
-posture-guardian/
+bapode/
 ├── AGENTS.md                          # [Lapis 1] Instruksi global & peta konteks agen
 ├── BACKLOG.md                         # [Lapis 3] Pelacak milestone & status implementasi
 ├── docs/                              # [Lapis 2] Konteks modular (baca sesuai tugas)

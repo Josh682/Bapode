@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Posture Guardian v3.0 — Application Launcher
+# Bapode v3.0 — Application Launcher
 # Reference: docs/TROUBLESHOOTING_QT_COCOA.md
 
 set -e
