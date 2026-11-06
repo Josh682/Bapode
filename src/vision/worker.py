@@ -14,7 +14,7 @@ import queue
 import time
 from datetime import datetime
 
-from PySide6 import QtCore
+import numpy as np
 
 from camera.reader import CameraFrame
 from db.manager import CalibrationProfileRecord
@@ -27,6 +27,8 @@ from tracker.states import (
     VisibilityState,
 )
 from tracker.telemetry import SessionOrchestrator
+from ui.qt import QtCore, QtGui
+from vision.annotator import FrameAnnotator
 from vision.association import VisibilityEvaluator, associate_primary_subject
 from vision.detector import SequentialLandmarkDetector
 from vision.landmarks import FaceLandmarkData, PoseLandmarkData
@@ -50,6 +52,7 @@ class VisionTrackerWorker(QtCore.QThread):
     drift_detected = QtCore.Signal(str)  # drift description
     snooze_status_changed = QtCore.Signal(bool, float)  # is_snoozed, remaining_s
     live_telemetry = QtCore.Signal(dict)  # Live telemetry for threshold tuning
+    frame_annotated = QtCore.Signal(QtGui.QImage)  # Live annotated camera feed for GUI
 
     def __init__(
         self,
@@ -226,7 +229,7 @@ class VisionTrackerWorker(QtCore.QThread):
                 self.orchestrator is not None
                 and self.orchestrator.operating_mode == OperatingMode.CALIBRATING
             ):
-                self._process_calibration_tick(pose_data, detected_faces)
+                self._process_calibration_tick(frame.image, pose_data, detected_faces)
                 continue
 
             # 3. Active Monitoring Processing
@@ -334,6 +337,18 @@ class VisionTrackerWorker(QtCore.QThread):
             }
             self.live_telemetry.emit(telemetry_data)
 
+            # Emit live annotated frame for GUI Camera View
+            annotated = FrameAnnotator.annotate(
+                image_bgr=frame.image,
+                pose=pose_data,
+                face=primary_face,
+                vis_state=vis_state,
+                violations=snapshot.violation_flags,
+                is_moving=is_moving,
+                is_calibrating=False,
+            )
+            self.frame_annotated.emit(annotated)
+
             # Check Alert and Microbreak triggers
             if snapshot.ui_level == UIIntrusivenessLevel.ACTIVE_OVERLAY:
                 self.alert_triggered.emit("ACTIVE_OVERLAY", 15.0)
@@ -348,6 +363,7 @@ class VisionTrackerWorker(QtCore.QThread):
 
     def _process_calibration_tick(
         self,
+        image: np.ndarray,
         pose: PoseLandmarkData | None,
         faces: list[FaceLandmarkData],
     ) -> None:
@@ -355,29 +371,68 @@ class VisionTrackerWorker(QtCore.QThread):
         target = self.calibration_engine.target_samples
 
         if pose is None or not faces:
+            prompt = "Posisikan wajah dan bahu di depan kamera."
             self.calibration_progress.emit(
                 len(self.calibration_engine.samples),
                 target,
                 False,
-                "Posisikan wajah dan bahu di depan kamera.",
+                prompt,
+            )
+            self.frame_annotated.emit(
+                FrameAnnotator.annotate(
+                    image_bgr=image,
+                    pose=pose,
+                    face=faces[0] if faces else None,
+                    is_calibrating=True,
+                    calib_current=len(self.calibration_engine.samples),
+                    calib_total=target,
+                    calib_plausible=False,
+                    calib_feedback=prompt,
+                )
             )
             return
 
         face = faces[0]
         is_valid, reason, _ = self.calibration_engine.validate_sample_plausibility(pose, face)
         if not is_valid:
+            prompt = reason or "Luruskan posisi tubuh..."
             self.calibration_progress.emit(
                 len(self.calibration_engine.samples),
                 target,
                 False,
-                reason or "Luruskan posisi tubuh...",
+                prompt,
+            )
+            self.frame_annotated.emit(
+                FrameAnnotator.annotate(
+                    image_bgr=image,
+                    pose=pose,
+                    face=face,
+                    is_calibrating=True,
+                    calib_current=len(self.calibration_engine.samples),
+                    calib_total=target,
+                    calib_plausible=False,
+                    calib_feedback=prompt,
+                )
             )
             return
 
         self.calibration_engine.add_sample(pose, face)
         count = len(self.calibration_engine.samples)
+        prompt = "Pertahankan posisi tegak lurus..."
 
-        self.calibration_progress.emit(count, target, True, "Pertahankan posisi tegak lurus...")
+        self.calibration_progress.emit(count, target, True, prompt)
+        self.frame_annotated.emit(
+            FrameAnnotator.annotate(
+                image_bgr=image,
+                pose=pose,
+                face=face,
+                is_calibrating=True,
+                calib_current=count,
+                calib_total=target,
+                calib_plausible=True,
+                calib_feedback=prompt,
+            )
+        )
 
         if count >= target:
             try:

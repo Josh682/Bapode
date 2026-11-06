@@ -102,6 +102,12 @@ class PostureGuardianApp(QtCore.QObject):
         self.vision_worker.calibration_progress.connect(self.calib_dialog.update_progress)
         self.vision_worker.calibration_completed.connect(self._on_calibration_completed)
         self.vision_worker.live_telemetry.connect(self.dashboard_window.update_live_telemetry)
+        self.vision_worker.frame_annotated.connect(self.dashboard_window.update_camera_frame)
+        self.vision_worker.frame_annotated.connect(self.calib_dialog.update_camera_frame)
+
+        # Connect Dashboard actions
+        self.dashboard_window.recalibrate_requested.connect(self._start_calibration_flow)
+        self.dashboard_window.snooze_requested.connect(self.vision_worker.set_snooze)
 
         # Connect Tray actions
         self.tray_manager.recalibrate_requested.connect(self._start_calibration_flow)

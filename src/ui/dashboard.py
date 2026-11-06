@@ -12,9 +12,9 @@ Implements:
 
 from typing import Any
 
-from PySide6 import QtCore, QtGui, QtWidgets
-
 from db.manager import DatabaseManager
+from ui.camera_view import CameraPreviewWidget
+from ui.qt import QtCore, QtGui, QtWidgets
 
 
 class GuidedCalibrationDialog(QtWidgets.QDialog):
@@ -23,13 +23,13 @@ class GuidedCalibrationDialog(QtWidgets.QDialog):
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Kalibrasi Referensi Postur (3 Detik)")
-        self.setFixedSize(480, 260)
+        self.setFixedSize(520, 500)
         self._init_ui()
 
     def _init_ui(self) -> None:
         layout = QtWidgets.QVBoxLayout(self)
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(16)
+        layout.setContentsMargins(18, 18, 18, 18)
+        layout.setSpacing(12)
 
         title = QtWidgets.QLabel("Duduk Tegak & Nyaman Menatap Layar")
         title.setFont(QtGui.QFont("Arial", 14, QtGui.QFont.Weight.Bold))
@@ -37,12 +37,17 @@ class GuidedCalibrationDialog(QtWidgets.QDialog):
         layout.addWidget(title)
 
         self.instruction_label = QtWidgets.QLabel(
-            "Posisikan kepala dan bahu simetris di depan webcam..."
+            "Posisikan kepala dan bahu simetris di dalam siluet pemandu..."
         )
         self.instruction_label.setWordWrap(True)
         self.instruction_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
         self.instruction_label.setStyleSheet("color: #9CA3AF; font-size: 13px;")
         layout.addWidget(self.instruction_label)
+
+        # Live Camera View with Silhouette Guide
+        self.preview = CameraPreviewWidget(self)
+        self.preview.setMinimumSize(480, 270)
+        layout.addWidget(self.preview)
 
         self.progress_bar = QtWidgets.QProgressBar()
         self.progress_bar.setRange(0, 15)
@@ -76,6 +81,11 @@ class GuidedCalibrationDialog(QtWidgets.QDialog):
         button_box.rejected.connect(self.reject)
         layout.addWidget(button_box)
 
+    def update_camera_frame(self, image: QtGui.QImage) -> None:
+        """Render incoming live calibration frame."""
+        if hasattr(self, "preview") and self.isVisible():
+            self.preview.update_frame(image)
+
     def update_progress(self, current: int, total: int, is_plausible: bool, feedback: str) -> None:
         """Update live progress and guidance text."""
         self.progress_bar.setValue(current)
@@ -96,13 +106,16 @@ class GuidedCalibrationDialog(QtWidgets.QDialog):
 class SessionTrendDashboard(QtWidgets.QMainWindow):
     """Session telemetry dashboard with honest occlusion bounds and 5-min buckets."""
 
+    recalibrate_requested = QtCore.Signal()
+    snooze_requested = QtCore.Signal(int)
+
     def __init__(
         self, db_manager: DatabaseManager, parent: QtWidgets.QWidget | None = None
     ) -> None:
         super().__init__(parent)
         self.db_manager = db_manager
         self.setWindowTitle("Posture Guardian — Dashboard Sesi & Tren")
-        self.resize(840, 580)
+        self.resize(880, 640)
         self._init_ui()
 
         # Auto-refresh timer
@@ -119,7 +132,57 @@ class SessionTrendDashboard(QtWidgets.QMainWindow):
         self.tabs = QtWidgets.QTabWidget()
         root_layout.addWidget(self.tabs)
 
-        # Tab 1: Sesi & Tren Historis
+        # Tab 1: Pratinjau Kamera (Live View)
+        tab_camera = QtWidgets.QWidget()
+        cam_layout = QtWidgets.QVBoxLayout(tab_camera)
+        cam_layout.setContentsMargins(16, 16, 16, 16)
+        cam_layout.setSpacing(12)
+
+        self.camera_preview = CameraPreviewWidget(tab_camera)
+        cam_layout.addWidget(self.camera_preview, stretch=1)
+
+        ctrl_bar = QtWidgets.QHBoxLayout()
+        ctrl_bar.setSpacing(12)
+
+        self.btn_recalibrate = QtWidgets.QPushButton("🎯 Kalibrasi Ulang (3 Detik)")
+        self.btn_recalibrate.setStyleSheet(
+            """
+            QPushButton {
+                background-color: #10B981;
+                color: #FFFFFF;
+                font-weight: bold;
+                padding: 10px 18px;
+                border-radius: 8px;
+                font-size: 13px;
+            }
+            QPushButton:hover { background-color: #059669; }
+            """
+        )
+        self.btn_recalibrate.clicked.connect(self.recalibrate_requested.emit)
+
+        self.btn_snooze = QtWidgets.QPushButton("☕ Jeda Pemantauan (Snooze 15m)")
+        self.btn_snooze.setStyleSheet(
+            """
+            QPushButton {
+                background-color: #374151;
+                color: #F9FAFB;
+                font-weight: bold;
+                padding: 10px 18px;
+                border-radius: 8px;
+                font-size: 13px;
+            }
+            QPushButton:hover { background-color: #4B5563; }
+            """
+        )
+        self.btn_snooze.clicked.connect(lambda: self.snooze_requested.emit(15))
+
+        ctrl_bar.addWidget(self.btn_recalibrate)
+        ctrl_bar.addWidget(self.btn_snooze)
+        ctrl_bar.addStretch()
+        cam_layout.addLayout(ctrl_bar)
+        self.tabs.addTab(tab_camera, "📷 Pratinjau Kamera (Live)")
+
+        # Tab 2: Sesi & Tren Historis
         tab_history = QtWidgets.QWidget()
         main_layout = QtWidgets.QVBoxLayout(tab_history)
         main_layout.setContentsMargins(16, 16, 16, 16)
@@ -371,3 +434,8 @@ class SessionTrendDashboard(QtWidgets.QMainWindow):
                 stat_item.setForeground(QtGui.QBrush(QtGui.QColor("#10B981")))
             self.live_table.setItem(r_idx, 5, stat_item)
             self.live_table.setItem(r_idx, 6, QtWidgets.QTableWidgetItem(b_str))
+
+    def update_camera_frame(self, image: QtGui.QImage) -> None:
+        """Receive live annotated frame from VisionTrackerWorker."""
+        if hasattr(self, "camera_preview") and self.isVisible():
+            self.camera_preview.update_frame(image)

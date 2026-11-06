@@ -31,7 +31,9 @@ class SystemTrayManager(QtCore.QObject):
         self._status_action.setEnabled(False)
 
         self.menu.addSeparator()
-        self._calib_action = self.menu.addAction("Kalibrasi Ulang (3 dtk)")
+        self._preview_action = self.menu.addAction("📷 Pratinjau Kamera (Live View)")
+        self._preview_action.triggered.connect(self.open_dashboard_requested.emit)
+        self._calib_action = self.menu.addAction("🎯 Kalibrasi Ulang (3 dtk)")
         self._calib_action.triggered.connect(self.recalibrate_requested.emit)
 
         # Snooze submenu
