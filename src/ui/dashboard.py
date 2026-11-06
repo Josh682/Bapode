@@ -14,6 +14,7 @@ from typing import Any
 
 from db.manager import DatabaseManager
 from ui.camera_view import CameraPreviewWidget
+from ui.platform_bridge import set_application_activation_policy
 from ui.qt import QtCore, QtGui, QtWidgets
 
 
@@ -469,6 +470,7 @@ class SessionTrendDashboard(QtWidgets.QMainWindow):
 
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:  # noqa: N802
         """Handle window close event without terminating background tracking."""
+        set_application_activation_policy(is_accessory=True)
         print(
             "\n[Bapode] Jendela Dashboard ditutup. "
             "Aplikasi tetap memantau di latar belakang (Menu Bar macOS kanan atas).\n"

@@ -18,7 +18,7 @@ from db.manager import DatabaseManager
 from db.worker import DatabaseWorker
 from ui.dashboard import GuidedCalibrationDialog, SessionTrendDashboard
 from ui.overlay import HUDOverlay
-from ui.platform_bridge import PlatformPowerListener
+from ui.platform_bridge import PlatformPowerListener, set_application_activation_policy
 from ui.qt import QtCore, QtWidgets
 from ui.tray import SystemTrayManager
 from vision.detector import SequentialLandmarkDetector
@@ -113,6 +113,9 @@ class BapodeApp(QtCore.QObject):
 
         # Connect Calibration dialog actions
         self.calib_dialog.quit_requested.connect(self.shutdown)
+        self.calib_dialog.rejected.connect(
+            lambda: set_application_activation_policy(is_accessory=True)
+        )
 
         # Connect Tray actions
         self.tray_manager.recalibrate_requested.connect(self._start_calibration_flow)
@@ -125,21 +128,26 @@ class BapodeApp(QtCore.QObject):
 
     def _start_calibration_flow(self) -> None:
         """Trigger calibration and open guided dialog."""
+        set_application_activation_policy(is_accessory=False)
         self.vision_worker.trigger_calibration()
         if self.calib_dialog is not None:
             self.calib_dialog.show()
             self.calib_dialog.raise_()
+            self.calib_dialog.activateWindow()
 
     def _on_calibration_completed(self, profile: Any) -> None:
         """Close dialog upon successful calibration."""
         if self.calib_dialog is not None:
             self.calib_dialog.accept()
+        set_application_activation_policy(is_accessory=True)
 
     def _open_dashboard(self) -> None:
         """Open or focus dashboard window."""
         if self.dashboard_window is not None:
+            set_application_activation_policy(is_accessory=False)
             self.dashboard_window.show()
             self.dashboard_window.raise_()
+            self.dashboard_window.activateWindow()
             self.dashboard_window.refresh_data()
 
     def start(self) -> None:
@@ -149,6 +157,10 @@ class BapodeApp(QtCore.QObject):
         self.vision_worker.start()
 
         if not self.headless and not self.calibrate_thresholds:
+            # Set background accessory policy by default unless explicit window requested
+            is_accessory = not (self.show_dashboard or self.start_calibration)
+            set_application_activation_policy(is_accessory=is_accessory)
+
             print("\n" + "=" * 80)
             print(" Bapode v3.0 Berjalan di Latar Belakang (Background Utility)")
             print("=" * 80)

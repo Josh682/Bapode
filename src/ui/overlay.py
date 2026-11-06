@@ -21,7 +21,7 @@ Implements:
 from PySide6 import QtCore, QtGui, QtWidgets
 
 from tracker.states import UIIntrusivenessLevel
-from ui.platform_bridge import set_screen_share_protected
+from ui.platform_bridge import set_screen_share_protected, show_window_non_activating
 
 
 class HUDOverlay(QtWidgets.QWidget):
@@ -35,7 +35,7 @@ class HUDOverlay(QtWidgets.QWidget):
         self._badge_color = QtGui.QColor("#EF4444")
         self._countdown_s: int = 60
 
-        # Auto-dismiss timer for temporary notices (e.g. NEEDS_RECALIBRATION)
+        # Auto-dismiss timer for temporary notices (e.g. NEEDS_RECALIBRATION, ideal recovery)
         self._auto_hide_timer = QtCore.QTimer(self)
         self._auto_hide_timer.setSingleShot(True)
         self._auto_hide_timer.timeout.connect(self.hide)
@@ -57,12 +57,16 @@ class HUDOverlay(QtWidgets.QWidget):
         self.resize(460, 68)
         self._reposition_to_top_center()
 
+        # Initialize native window handle and macOS collection behaviors immediately
+        set_screen_share_protected(self)
+
     def _reposition_to_top_center(self) -> None:
-        """Position overlay at the top-center of primary screen."""
-        screen = QtGui.QGuiApplication.primaryScreen()
+        """Position overlay at the top-center of currently active screen."""
+        cursor_pos = QtGui.QCursor.pos()
+        screen = QtGui.QGuiApplication.screenAt(cursor_pos) or QtGui.QGuiApplication.primaryScreen()
         if screen is not None:
             screen_geo = screen.geometry()
-            x = (screen_geo.width() - self.width()) // 2
+            x = screen_geo.left() + (screen_geo.width() - self.width()) // 2
             y = screen_geo.top() + 24
             self.move(x, y)
 
@@ -72,39 +76,58 @@ class HUDOverlay(QtWidgets.QWidget):
         set_screen_share_protected(self)
 
     def update_state(self, ui_level_str: str, message: str = "") -> None:
-        """Update visual presentation based on UIIntrusivenessLevel."""
+        """Update visual presentation based on UIIntrusivenessLevel.
+
+        - ACTIVE_OVERLAY: Shows alert (Red) until posture is corrected.
+        - When posture returns to ideal (SILENT_OK / cooldown):
+          Shows positive green badge for 5 seconds, then cleanly dismisses.
+        """
         try:
             level = UIIntrusivenessLevel(ui_level_str)
         except ValueError:
             level = UIIntrusivenessLevel.SILENT_OK
 
+        prev_level = self._current_level
         self._current_level = level
 
         if level == UIIntrusivenessLevel.ACTIVE_OVERLAY:
+            self._auto_hide_timer.stop()
             self._badge_color = QtGui.QColor("#EF4444")
             self._badge_text = message or "Perbaiki Postur: Kepala Maju / Bahu Merosot"
-            self.show()
-            self.raise_()
-            set_screen_share_protected(self)
+            self._reposition_to_top_center()
             self.update()
+            show_window_non_activating(self)
         elif level == UIIntrusivenessLevel.MICROBREAK_PROMPT:
+            self._auto_hide_timer.stop()
             self._badge_color = QtGui.QColor("#3B82F6")
             self._badge_text = message or f"Waktu Peregangan ({self._countdown_s}s)"
-            self.show()
-            self.raise_()
-            set_screen_share_protected(self)
+            self._reposition_to_top_center()
             self.update()
+            show_window_non_activating(self)
         elif ui_level_str == "NEEDS_RECALIBRATION":
+            self._auto_hide_timer.stop()
             self._badge_color = QtGui.QColor("#8B5CF6")
             self._badge_text = message or "Posisi Bergeser — Silakan Rekalibrasi"
-            self.show()
-            self.raise_()
-            set_screen_share_protected(self)
+            self._reposition_to_top_center()
             self.update()
+            show_window_non_activating(self)
             self._auto_hide_timer.start(5000)  # Auto-hide after 5s
         else:
-            # SILENT_OK, AMBIENT_WARN, SUPPRESSED_COOLDOWN -> hidden
-            self.hide()
+            # Posture is now ideal (SILENT_OK, AMBIENT_WARN, SUPPRESSED_COOLDOWN)
+            # If overlay was actively displaying an alert, provide positive feedback
+            # and dismiss after 5 seconds
+            if self.isVisible() and prev_level in (
+                UIIntrusivenessLevel.ACTIVE_OVERLAY,
+                UIIntrusivenessLevel.MICROBREAK_PROMPT,
+            ):
+                self._badge_color = QtGui.QColor("#10B981")
+                self._badge_text = "Postur Kembali Ideal"
+                self._reposition_to_top_center()
+                self.update()
+                show_window_non_activating(self)
+                self._auto_hide_timer.start(5000)
+            elif not self._auto_hide_timer.isActive():
+                self.hide()
 
     def paintEvent(self, event: QtGui.QPaintEvent) -> None:  # noqa: N802
         """Render pill badge notification."""

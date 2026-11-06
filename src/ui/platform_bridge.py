@@ -40,6 +40,7 @@ def set_screen_share_protected(widget: QtWidgets.QWidget) -> bool:
                 NSWindowCollectionBehaviorCanJoinAllSpaces,
                 NSWindowCollectionBehaviorFullScreenAuxiliary,
                 NSWindowCollectionBehaviorIgnoresCycle,
+                NSWindowCollectionBehaviorMoveToActiveSpace,
             )
 
             win_id = int(widget.winId())
@@ -59,6 +60,7 @@ def set_screen_share_protected(widget: QtWidgets.QWidget) -> bool:
                 # Ensure overlay stays visible across virtual desktops and fullscreen apps
                 behavior = (
                     NSWindowCollectionBehaviorCanJoinAllSpaces
+                    | NSWindowCollectionBehaviorMoveToActiveSpace
                     | NSWindowCollectionBehaviorFullScreenAuxiliary
                     | NSWindowCollectionBehaviorIgnoresCycle
                 )
@@ -80,6 +82,54 @@ def set_screen_share_protected(widget: QtWidgets.QWidget) -> bool:
             return False
 
     return False
+
+
+def show_window_non_activating(widget: QtWidgets.QWidget) -> None:
+    """Display window without stealing focus or triggering macOS Space switching."""
+    widget.show()
+    if sys.platform == "darwin":
+        from PySide6 import QtGui
+
+        if QtGui.QGuiApplication.platformName() == "cocoa":
+            try:
+                import objc
+
+                win_id = int(widget.winId())
+                if win_id > 0x1000:
+                    ns_view = objc.objc_object(c_void_p=win_id)
+                    ns_window = ns_view.window()
+                    if ns_window is not None:
+                        ns_window.orderFrontRegardless()
+            except Exception:
+                pass
+
+
+def set_application_activation_policy(is_accessory: bool = True) -> None:
+    """Set macOS application activation policy.
+
+    is_accessory=True: App runs as background utility without Dock icon
+                       and never causes Space switches when showing notifications.
+    is_accessory=False: App runs as regular foreground app.
+    """
+    if sys.platform == "darwin":
+        from PySide6 import QtGui
+
+        if QtGui.QGuiApplication.platformName() == "cocoa":
+            try:
+                from AppKit import (
+                    NSApp,
+                    NSApplicationActivationPolicyAccessory,
+                    NSApplicationActivationPolicyRegular,
+                )
+
+                policy = (
+                    NSApplicationActivationPolicyAccessory
+                    if is_accessory
+                    else NSApplicationActivationPolicyRegular
+                )
+                NSApp.setActivationPolicy_(policy)
+            except Exception:
+                pass
 
 
 class PlatformPowerListener(QtCore.QObject):

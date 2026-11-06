@@ -31,7 +31,12 @@ from tracker.states import (
     VisibilityState,
 )
 from ui.overlay import HUDOverlay
-from ui.platform_bridge import PlatformPowerListener, set_screen_share_protected
+from ui.platform_bridge import (
+    PlatformPowerListener,
+    set_application_activation_policy,
+    set_screen_share_protected,
+    show_window_non_activating,
+)
 from ui.tray import SystemTrayManager
 
 
@@ -135,12 +140,48 @@ class TestUIAndPlatformBridge:
         assert overlay.testAttribute(QtCore.Qt.WidgetAttribute.WA_ShowWithoutActivating)
         assert overlay.testAttribute(QtCore.Qt.WidgetAttribute.WA_TranslucentBackground)
 
-        # Visual state transitions
+        # Visual state transitions: Active alert
         overlay.update_state("ACTIVE_OVERLAY", "Test Warning")
         assert overlay.isVisible()
+        assert overlay._badge_text == "Test Warning"
 
+        # When posture returns to ideal, displays positive feedback for 5 seconds before hiding
         overlay.update_state("SILENT_OK")
+        assert overlay.isVisible()
+        assert overlay._badge_text == "Postur Kembali Ideal"
+        assert overlay._auto_hide_timer.isActive()
+
+        # After 5s timeout, notification dismisses
+        overlay._auto_hide_timer.timeout.emit()
         assert overlay.isHidden()
+        overlay.close()
+
+    def test_hud_overlay_relapse_cancellation_and_activation_policy(
+        self, qapp: QtWidgets.QApplication
+    ) -> None:
+        overlay = HUDOverlay()
+
+        # Step 1: Slump -> Active alert
+        overlay.update_state("ACTIVE_OVERLAY", "Perbaiki Postur")
+        assert overlay.isVisible()
+        assert overlay._badge_color.name().upper() == "#EF4444"
+
+        # Step 2: Ideal -> Green positive feedback
+        overlay.update_state("SILENT_OK")
+        assert overlay.isVisible()
+        assert overlay._badge_color.name().upper() == "#10B981"
+        assert overlay._auto_hide_timer.isActive()
+
+        # Step 3: Relapse to bad posture before 5s elapsed -> timer cancels, turns red again
+        overlay.update_state("ACTIVE_OVERLAY", "Membungkuk Lagi")
+        assert not overlay._auto_hide_timer.isActive()
+        assert overlay._badge_color.name().upper() == "#EF4444"
+        assert overlay._badge_text == "Membungkuk Lagi"
+
+        # Step 4: Test non-activating and activation policy helpers
+        show_window_non_activating(overlay)
+        set_application_activation_policy(is_accessory=True)
+        set_application_activation_policy(is_accessory=False)
         overlay.close()
 
     def test_screen_share_safe_bridge(self, qapp: QtWidgets.QApplication) -> None:
