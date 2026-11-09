@@ -10,6 +10,7 @@ Implements:
 3. Guided 3-second calibration dialog with live feedback.
 """
 
+import sys
 from typing import Any
 
 from db.manager import DatabaseManager
@@ -29,8 +30,14 @@ class GuidedCalibrationDialog(QtWidgets.QDialog):
         self.setFixedSize(520, 500)
         self._init_ui()
 
-        # Keyboard shortcuts: Cmd+Q quits application
-        self.quit_shortcut = QtGui.QShortcut(QtGui.QKeySequence.StandardKey.Quit, self)
+        # Keyboard shortcuts: Ctrl+Q (Windows) / Cmd+Q (macOS) quits application
+        if sys.platform == "win32":
+            quit_key: QtGui.QKeySequence | QtGui.QKeySequence.StandardKey = QtGui.QKeySequence(
+                "Ctrl+Q"
+            )
+        else:
+            quit_key = QtGui.QKeySequence.StandardKey.Quit
+        self.quit_shortcut = QtGui.QShortcut(quit_key, self)
         self.quit_shortcut.activated.connect(self.quit_requested.emit)
 
     def _init_ui(self) -> None:
@@ -126,16 +133,22 @@ class SessionTrendDashboard(QtWidgets.QMainWindow):
         self.resize(880, 640)
         self._init_ui()
 
-        # Keyboard shortcut: Cmd+Q quits application
-        self.quit_shortcut = QtGui.QShortcut(QtGui.QKeySequence.StandardKey.Quit, self)
+        # Keyboard shortcut: Ctrl+Q (Windows) / Cmd+Q (macOS) quits application
+        if sys.platform == "win32":
+            quit_seq: QtGui.QKeySequence | QtGui.QKeySequence.StandardKey = QtGui.QKeySequence(
+                "Ctrl+Q"
+            )
+        else:
+            quit_seq = QtGui.QKeySequence.StandardKey.Quit
+        self.quit_shortcut = QtGui.QShortcut(quit_seq, self)
         self.quit_shortcut.setContext(QtCore.Qt.ShortcutContext.ApplicationShortcut)
         self.quit_shortcut.activated.connect(self.quit_requested.emit)
 
-        # Native Menu Bar with Quit action (Cmd+Q)
+        # Native Menu Bar with Quit action
         menu_bar = self.menuBar()
         app_menu = menu_bar.addMenu("Aplikasi")
         quit_action = app_menu.addAction("Keluar Bapode")
-        quit_action.setShortcut(QtGui.QKeySequence.StandardKey.Quit)
+        quit_action.setShortcut(quit_seq)
         quit_action.triggered.connect(self.quit_requested.emit)
 
         # Auto-refresh timer
@@ -471,10 +484,18 @@ class SessionTrendDashboard(QtWidgets.QMainWindow):
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:  # noqa: N802
         """Handle window close event without terminating background tracking."""
         set_application_activation_policy(is_accessory=True)
-        print(
-            "\n[Bapode] Jendela Dashboard ditutup. "
-            "Aplikasi tetap memantau di latar belakang (Menu Bar macOS kanan atas).\n"
-            "  • Untuk keluar aplikasi: Tekan Cmd+Q, klik tombol 'Keluar' pada Menu Bar, "
-            "atau tekan Ctrl+C di terminal.\n"
-        )
+        if sys.platform == "win32":
+            print(
+                "\n[Bapode] Jendela Dashboard ditutup. "
+                "Aplikasi tetap memantau di latar belakang (System Tray kanan bawah).\n"
+                "  • Untuk keluar aplikasi: Tekan Ctrl+Q, klik kanan ikon System Tray "
+                "lalu pilih 'Keluar', atau tekan Ctrl+C di terminal.\n"
+            )
+        else:
+            print(
+                "\n[Bapode] Jendela Dashboard ditutup. "
+                "Aplikasi tetap memantau di latar belakang (Menu Bar macOS kanan atas).\n"
+                "  • Untuk keluar aplikasi: Tekan Cmd+Q, klik tombol 'Keluar' pada Menu Bar, "
+                "atau tekan Ctrl+C di terminal.\n"
+            )
         super().closeEvent(event)

@@ -35,8 +35,19 @@ def run_smoke_test(
     target_fps: float = 5.0,
 ) -> int:
     """Run real camera acquisition and MediaPipe Tasks extraction test."""
+    if sys.platform == "win32":
+        # Windows consoles often default to cp1252, which raises UnicodeEncodeError
+        # on characters such as '—' and '°'.
+        if hasattr(sys.stdout, "reconfigure"):
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        if hasattr(sys.stderr, "reconfigure"):
+            sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
     print("=" * 80)
-    print(" Bapode v3.0 — Physical Webcam & MediaPipe Tasks Smoke Test")
+    if sys.platform == "win32":
+        print(" Bapode v3.0 - Physical Webcam & MediaPipe Tasks Smoke Test")
+    else:
+        print(" Bapode v3.0 — Physical Webcam & MediaPipe Tasks Smoke Test")
     print("=" * 80)
 
     # 1. Ensure models exist
@@ -56,15 +67,34 @@ def run_smoke_test(
     try:
         import cv2
 
-        cap = cv2.VideoCapture(camera_index)
-        if not cap.isOpened():
-            print(
-                f"  GAGAL: Kamera index {camera_index} tidak dapat dibuka.\n"
-                "  Periksa izin kamera macOS (System Settings -> Privacy & Security -> Camera)\n"
-                "  atau pastikan webcam tidak sedang digunakan oleh aplikasi lain.",
-                file=sys.stderr,
-            )
-            return 1
+        if sys.platform == "win32":
+            # Windows: DirectShow avoids MSMF lag/freeze; fall back to MSMF if needed
+            cap = cv2.VideoCapture(camera_index, cv2.CAP_DSHOW)
+            if not cap.isOpened():
+                cap.release()
+                cap = cv2.VideoCapture(camera_index, cv2.CAP_MSMF)
+            if not cap.isOpened():
+                print(
+                    f"  GAGAL: Kamera index {camera_index} tidak dapat dibuka.\n"
+                    "  Periksa izin kamera Windows (Settings -> Privacy & security -> Camera,\n"
+                    "  aktifkan 'Let desktop apps access your camera')\n"
+                    "  atau pastikan webcam tidak sedang digunakan oleh aplikasi lain.",
+                    file=sys.stderr,
+                )
+                return 1
+            cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
+            cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        else:
+            cap = cv2.VideoCapture(camera_index)
+            if not cap.isOpened():
+                print(
+                    f"  GAGAL: Kamera index {camera_index} tidak dapat dibuka.\n"
+                    "  Periksa izin kamera macOS "
+                    "(System Settings -> Privacy & Security -> Camera)\n"
+                    "  atau pastikan webcam tidak sedang digunakan oleh aplikasi lain.",
+                    file=sys.stderr,
+                )
+                return 1
 
         # Set resolution to 1280x720
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)

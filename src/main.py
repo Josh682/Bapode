@@ -164,8 +164,15 @@ class BapodeApp(QtCore.QObject):
             print("\n" + "=" * 80)
             print(" Bapode v3.0 Berjalan di Latar Belakang (Background Utility)")
             print("=" * 80)
-            print(" • Status Icon : Periksa Menu Bar macOS di pojok kanan atas (lingkaran hijau)")
-            print(" • Menu Aksi   : Klik ikon Menu Bar untuk:")
+            if sys.platform == "win32":
+                print(
+                    " • Status Icon : Periksa System Tray Windows di kanan bawah "
+                    "(lingkaran hijau)"
+                )
+                print(" • Menu Aksi   : Klik kanan ikon System Tray untuk:")
+            else:
+                print(" • Status Icon : Periksa Menu Bar macOS di pojok kanan atas (lingkaran hijau)")
+                print(" • Menu Aksi   : Klik ikon Menu Bar untuk:")
             print("                 - Buka Dashboard Sesi & Tren Historis")
             print("                 - Kalibrasi Ulang (3 Detik)")
             print("                 - Jeda Pemantauan (Snooze 15 / 30 / 60 Menit)")
@@ -274,8 +281,31 @@ class BapodeApp(QtCore.QObject):
 PostureGuardianApp = BapodeApp
 
 
+def _enable_windows_ansi_console() -> None:
+    """Enable UTF-8 output and ANSI/VT100 escape sequences on Windows consoles."""
+    if sys.platform != "win32":
+        return
+    try:
+        if hasattr(sys.stdout, "reconfigure"):
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        if hasattr(sys.stderr, "reconfigure"):
+            sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+        import ctypes
+
+        kernel32 = ctypes.windll.kernel32
+        handle = kernel32.GetStdHandle(-11)  # STD_OUTPUT_HANDLE
+        mode = ctypes.c_uint32()
+        if kernel32.GetConsoleMode(handle, ctypes.byref(mode)):
+            # ENABLE_VIRTUAL_TERMINAL_PROCESSING = 0x0004
+            kernel32.SetConsoleMode(handle, mode.value | 0x0004)
+    except Exception:
+        pass
+
+
 def main() -> int:
     """CLI bootstrap and entry point."""
+    if sys.platform == "win32":
+        _enable_windows_ansi_console()
     parser = argparse.ArgumentParser(description="Bapode v3.0 Desktop Application")
     parser.add_argument(
         "--mock-camera", action="store_true", help="Run with synthetic camera frames"
