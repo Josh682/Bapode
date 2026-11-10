@@ -10,11 +10,13 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+import tempfile
 import time
 from pathlib import Path
 
 # Ensure MPLCONFIGDIR is set to avoid slow font cache building
-os.environ.setdefault("MPLCONFIGDIR", "/tmp/matplotlib")
+mpl_dir = os.path.join(tempfile.gettempdir(), "bapode_matplotlib")
+os.environ.setdefault("MPLCONFIGDIR", mpl_dir)
 
 # Ensure repository root and src are on sys.path
 REPO_ROOT = Path(__file__).resolve().parent.parent
