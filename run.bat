@@ -1,6 +1,6 @@
 @echo off
 REM Bapode v3.0 - Application Launcher (Windows)
-REM Windows counterpart of run.sh (run.sh remains the macOS/Linux launcher).
+REM Windows counterpart of run.sh
 
 setlocal
 set "SCRIPT_DIR=%~dp0"
@@ -14,7 +14,17 @@ if exist "%SCRIPT_DIR%.venv\Scripts\python.exe" (
 ) else if exist "%SCRIPT_DIR%venv\Scripts\python.exe" (
     set "PYTHON_EXEC=%SCRIPT_DIR%venv\Scripts\python.exe"
 ) else (
-    set "PYTHON_EXEC=python"
+    if exist "%SCRIPT_DIR%setup_windows.bat" (
+        echo [!] Virtual environment belum disiapkan. Menjalankan setup...
+        call "%SCRIPT_DIR%setup_windows.bat"
+        if exist "%SCRIPT_DIR%.venv\Scripts\python.exe" (
+            set "PYTHON_EXEC=%SCRIPT_DIR%.venv\Scripts\python.exe"
+        ) else (
+            set "PYTHON_EXEC=python"
+        )
+    ) else (
+        set "PYTHON_EXEC=python"
+    )
 )
 
 set "PYTHONPATH=%SCRIPT_DIR%src;%PYTHONPATH%"
