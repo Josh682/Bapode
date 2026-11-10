@@ -28,5 +28,7 @@ if exist "%SCRIPT_DIR%.venv\Scripts\python.exe" (
 )
 
 set "PYTHONPATH=%SCRIPT_DIR%src;%PYTHONPATH%"
-"%PYTHON_EXEC%" "%SCRIPT_DIR%src\main.py" %*
+set "CMD_ARGS=%*"
+if "%~1"=="" set "CMD_ARGS=--show-dashboard"
+"%PYTHON_EXEC%" "%SCRIPT_DIR%src\main.py" %CMD_ARGS%
 exit /b %ERRORLEVEL%

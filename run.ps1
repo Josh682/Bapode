@@ -10,4 +10,8 @@ if (-not (Test-Path $PythonExec)) {
 }
 
 $env:PYTHONPATH = "$ScriptDir\src;" + $env:PYTHONPATH
-& $PythonExec "$ScriptDir\src\main.py" @args
+$cmdArgs = $args
+if ($cmdArgs.Count -eq 0) {
+    $cmdArgs = @("--show-dashboard")
+}
+& $PythonExec "$ScriptDir\src\main.py" @cmdArgs
