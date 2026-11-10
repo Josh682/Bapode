@@ -66,6 +66,7 @@ class CameraReader(threading.Thread):
                 import cv2
 
                 if sys.platform == "win32":
+                if sys.platform == "win32":
                     # Windows: force DirectShow backend to avoid MSMF lag/freeze
                     cap = self._open_windows_capture(cv2)
                 else:
