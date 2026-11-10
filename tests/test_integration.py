@@ -205,6 +205,37 @@ class TestUIAndPlatformBridge:
         assert sleep_called == [True]
         assert wake_called == [True]
 
+    def test_windows_power_event_filter(self, qapp: QtWidgets.QApplication) -> None:
+        from ui.platform_bridge import (
+            PlatformPowerListener,
+            WindowsPowerEventFilter,
+            WM_POWERBROADCAST,
+            PBT_APMSUSPEND,
+            PBT_APMRESUMEAUTOMATIC,
+            _WinMSG,
+        )
+        import ctypes
+
+        listener = PlatformPowerListener()
+        sleep_called = []
+        wake_called = []
+        listener.system_will_sleep.connect(lambda: sleep_called.append(True))
+        listener.system_did_wake.connect(lambda: wake_called.append(True))
+
+        filt = WindowsPowerEventFilter(listener)
+
+        msg_suspend = _WinMSG(
+            hwnd=0, message=WM_POWERBROADCAST, wParam=PBT_APMSUSPEND, lParam=0, time=0
+        )
+        filt.nativeEventFilter(b"windows_generic_MSG", ctypes.addressof(msg_suspend))
+        assert sleep_called == [True]
+
+        msg_resume = _WinMSG(
+            hwnd=0, message=WM_POWERBROADCAST, wParam=PBT_APMRESUMEAUTOMATIC, lParam=0, time=0
+        )
+        filt.nativeEventFilter(b"windows_generic_MSG", ctypes.addressof(msg_resume))
+        assert wake_called == [True]
+
     def test_system_tray_status_colors(self, qapp: QtWidgets.QApplication) -> None:
         tray = SystemTrayManager()
         messages: list[tuple[str, str]] = []

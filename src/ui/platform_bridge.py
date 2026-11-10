@@ -1,23 +1,36 @@
-"""Operating System Abstraction Bridge for Bapode.
+"""Operating System Abstraction Bridge for Bapode Windows Edition.
 
 Reference: docs/DESIGN_SYSTEM.md & docs/ARCHITECTURE.md
 Implements:
 1. Screen-Sharing Protection:
-   - macOS: NSWindowSharingNone (0) via PyObjC / AppKit
    - Windows: SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE = 0x11)
-   - Linux / CI: Safe no-op fallback
-2. OS Sleep/Wake Notification Listeners:
-   - macOS: NSWorkspaceWillSleepNotification / NSWorkspaceDidWakeNotification
-   - Windows: WM_POWERBROADCAST (PBT_APMSUSPEND, PBT_APMRESUMEAUTOMATIC)
-3. Fullscreen Meeting / Presentation Detector (PAUSED_MEETING_AUTO).
+2. Non-Activating HUD Display:
+   - Win32 ShowWindow(hwnd, SW_SHOWNOACTIVATE) and SetWindowPos
+3. OS Sleep/Wake Notification Listeners:
+   - Windows: WM_POWERBROADCAST (PBT_APMSUSPEND, PBT_APMRESUMEAUTOMATIC, PBT_APMRESUMESUSPEND)
+     via PySide6 QAbstractNativeEventFilter
+4. Fullscreen Meeting / Presentation Detector (PAUSED_MEETING_AUTO).
 """
 
+from __future__ import annotations
+
 import ctypes
-import sys
 from collections.abc import Callable
+import sys
 from typing import Any
 
 from PySide6 import QtCore, QtWidgets
+
+from ctypes import wintypes
+
+# Win32 Constants
+WDA_EXCLUDEFROMCAPTURE = 0x00000011
+SW_SHOWNOACTIVATE = 4
+HWND_TOPMOST = -1
+SWP_NOSIZE = 0x0001
+SWP_NOMOVE = 0x0002
+SWP_NOACTIVATE = 0x0010
+SWP_SHOWWINDOW = 0x0040
 
 # Win32 power-management message constants (winuser.h)
 _WM_POWERBROADCAST = 0x0218
@@ -25,118 +38,56 @@ _PBT_APMSUSPEND = 0x0004
 _PBT_APMRESUMESUSPEND = 0x0007
 _PBT_APMRESUMEAUTOMATIC = 0x0012
 
+# Aliases for public access and tests
+WM_POWERBROADCAST = _WM_POWERBROADCAST
+PBT_APMSUSPEND = _PBT_APMSUSPEND
+PBT_APMRESUMEAUTOMATIC = _PBT_APMRESUMEAUTOMATIC
+PBT_APMRESUMESUSPEND = _PBT_APMRESUMESUSPEND
+_WinMSG = wintypes.MSG
+
 
 def set_screen_share_protected(widget: QtWidgets.QWidget) -> bool:
     """Make the widget invisible to screen recording/sharing while remaining visible to the user.
 
-    - macOS: Sets NSWindowSharingNone
-    - Windows: Sets WDA_EXCLUDEFROMCAPTURE (0x00000011)
+    Uses Win32 SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE = 0x00000011).
     """
-    if sys.platform == "darwin":
-        # Guard against offscreen platform during headless testing / CI
-        from PySide6 import QtGui
-
-        if QtGui.QGuiApplication.platformName() != "cocoa":
-            return False
-
+    if sys.platform == "win32":
         try:
-            # PyObjC AppKit integration
-            import objc
-            from AppKit import (
-                NSStatusWindowLevel,
-                NSWindowCollectionBehaviorCanJoinAllSpaces,
-                NSWindowCollectionBehaviorFullScreenAuxiliary,
-                NSWindowCollectionBehaviorIgnoresCycle,
-                NSWindowCollectionBehaviorMoveToActiveSpace,
-            )
-
-            win_id = int(widget.winId())
-            if win_id <= 0x1000:
-                return False
-
-            ns_view = objc.objc_object(c_void_p=win_id)
-            ns_window = ns_view.window()
-            if ns_window is not None:
-                # NSWindowSharingNone = 0
-                ns_window.setSharingType_(0)
-                # CRITICAL: Do NOT hide overlay when another app is focused/active
-                if hasattr(ns_window, "setHidesOnDeactivate_"):
-                    ns_window.setHidesOnDeactivate_(False)
-                # Float above normal application windows
-                ns_window.setLevel_(NSStatusWindowLevel)
-                # Ensure overlay stays visible across virtual desktops and fullscreen apps
-                behavior = (
-                    NSWindowCollectionBehaviorCanJoinAllSpaces
-                    | NSWindowCollectionBehaviorMoveToActiveSpace
-                    | NSWindowCollectionBehaviorFullScreenAuxiliary
-                    | NSWindowCollectionBehaviorIgnoresCycle
-                )
-                ns_window.setCollectionBehavior_(behavior)
-                return True
-        except Exception:
-            return False
-
-    elif sys.platform == "win32":
-        try:
-            # Win32 SetWindowDisplayAffinity
-            # WDA_EXCLUDEFROMCAPTURE = 0x00000011
-            wda_exclude = 0x00000011
             hwnd = int(widget.winId())
-            user32 = ctypes.windll.user32
-            result = user32.SetWindowDisplayAffinity(hwnd, wda_exclude)
-            return bool(result != 0)
+            if hwnd > 0:
+                user32 = ctypes.windll.user32
+                result = user32.SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE)
+                return bool(result != 0)
         except Exception:
             return False
-
     return False
 
 
 def show_window_non_activating(widget: QtWidgets.QWidget) -> None:
-    """Display window without stealing focus or triggering macOS Space switching."""
+    """Display window without stealing focus or activating."""
     widget.show()
-    if sys.platform == "darwin":
-        from PySide6 import QtGui
-
-        if QtGui.QGuiApplication.platformName() == "cocoa":
-            try:
-                import objc
-
-                win_id = int(widget.winId())
-                if win_id > 0x1000:
-                    ns_view = objc.objc_object(c_void_p=win_id)
-                    ns_window = ns_view.window()
-                    if ns_window is not None:
-                        ns_window.orderFrontRegardless()
-            except Exception:
-                pass
+    if sys.platform == "win32":
+        try:
+            hwnd = int(widget.winId())
+            if hwnd > 0:
+                user32 = ctypes.windll.user32
+                user32.ShowWindow(hwnd, SW_SHOWNOACTIVATE)
+                user32.SetWindowPos(
+                    hwnd,
+                    HWND_TOPMOST,
+                    0,
+                    0,
+                    0,
+                    0,
+                    SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE | SWP_SHOWWINDOW,
+                )
+        except Exception:
+            pass
 
 
 def set_application_activation_policy(is_accessory: bool = True) -> None:
-    """Set macOS application activation policy.
-
-    is_accessory=True: App runs as background utility without Dock icon
-                       and never causes Space switches when showing notifications.
-    is_accessory=False: App runs as regular foreground app.
-    """
-    if sys.platform == "darwin":
-        from PySide6 import QtGui
-
-        if QtGui.QGuiApplication.platformName() == "cocoa":
-            try:
-                from AppKit import (
-                    NSApp,
-                    NSApplicationActivationPolicyAccessory,
-                    NSApplicationActivationPolicyRegular,
-                )
-
-                policy = (
-                    NSApplicationActivationPolicyAccessory
-                    if is_accessory
-                    else NSApplicationActivationPolicyRegular
-                )
-                NSApp.setActivationPolicy_(policy)
-            except Exception:
-                pass
+    """Placeholder for OS activation policy (safe no-op on Windows)."""
+    pass
 
 
 class _WindowsPowerEventFilter(QtCore.QAbstractNativeEventFilter):
@@ -147,10 +98,21 @@ class _WindowsPowerEventFilter(QtCore.QAbstractNativeEventFilter):
     per suspend cycle.
     """
 
-    def __init__(self, on_sleep: Callable[[], None], on_wake: Callable[[], None]) -> None:
+    def __init__(
+        self,
+        listener_or_on_sleep: Any = None,
+        on_wake: Callable[[], None] | None = None,
+    ) -> None:
         super().__init__()
-        self._on_sleep = on_sleep
-        self._on_wake = on_wake
+        if callable(listener_or_on_sleep) and on_wake is not None:
+            self._on_sleep = listener_or_on_sleep
+            self._on_wake = on_wake
+        elif hasattr(listener_or_on_sleep, "system_will_sleep"):
+            self._on_sleep = listener_or_on_sleep.system_will_sleep.emit
+            self._on_wake = listener_or_on_sleep.system_did_wake.emit
+        else:
+            self._on_sleep = lambda: None
+            self._on_wake = lambda: None
         self._suspended = False
 
     def nativeEventFilter(self, eventType: Any, message: Any) -> Any:  # noqa: N802, N803
@@ -176,6 +138,9 @@ class _WindowsPowerEventFilter(QtCore.QAbstractNativeEventFilter):
         return False, 0
 
 
+WindowsPowerEventFilter = _WindowsPowerEventFilter
+
+
 class PlatformPowerListener(QtCore.QObject):
     """Listens for OS Sleep and Wake power notifications across platforms."""
 
@@ -185,31 +150,13 @@ class PlatformPowerListener(QtCore.QObject):
     def __init__(self, parent: QtCore.QObject | None = None) -> None:
         super().__init__(parent)
         self._registered = False
+        self._win_power_filter: _WindowsPowerEventFilter | None = None
+        self._win_power_window: Any = None
         self._init_platform_listener()
 
     def _init_platform_listener(self) -> None:
         """Register OS-specific sleep/wake handlers."""
-        if sys.platform == "darwin":
-            try:
-                from AppKit import NSWorkspace  # pyright: ignore[reportMissingImports]
-
-                nc = NSWorkspace.sharedWorkspace().notificationCenter()
-                nc.addObserver_selector_name_object_(
-                    self,
-                    "onMacSleep:",
-                    "NSWorkspaceWillSleepNotification",
-                    None,
-                )
-                nc.addObserver_selector_name_object_(
-                    self,
-                    "onMacWake:",
-                    "NSWorkspaceDidWakeNotification",
-                    None,
-                )
-                self._registered = True
-            except Exception:
-                pass
-        elif sys.platform == "win32":
+        if sys.platform == "win32":
             self._init_windows_listener()
 
     def _init_windows_listener(self) -> None:
@@ -242,14 +189,6 @@ class PlatformPowerListener(QtCore.QObject):
         except Exception:
             pass
 
-    def onMacSleep_(self, notification: Any) -> None:  # noqa: N802
-        """PyObjC selector for macOS sleep."""
-        self.system_will_sleep.emit()
-
-    def onMacWake_(self, notification: Any) -> None:  # noqa: N802
-        """PyObjC selector for macOS wake."""
-        self.system_did_wake.emit()
-
     def simulate_sleep(self) -> None:
         """Test helper to simulate system entering sleep."""
         self.system_will_sleep.emit()
@@ -261,7 +200,6 @@ class PlatformPowerListener(QtCore.QObject):
 
 def is_meeting_app_fullscreen() -> bool:
     """Detect if common meeting apps (Zoom, Teams, Meet) are active in fullscreen."""
-    # Heuristic detection; falls back cleanly to False
     _meeting_process_names = {
         "zoom.us",
         "teams",
@@ -272,7 +210,6 @@ def is_meeting_app_fullscreen() -> bool:
     }
     if sys.platform == "win32":
         return _is_windows_meeting_fullscreen(_meeting_process_names)
-    # Platform-specific check can be expanded; default non-blocking False
     return False
 
 
