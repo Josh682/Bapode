@@ -13,13 +13,24 @@ authors = [
 ]
 dependencies = [
     "numpy>=1.26.0",
-    "pyobjc-core>=10.0; sys_platform == 'darwin'",
-    "pyobjc-framework-Cocoa>=10.0; sys_platform == 'darwin'",
+    "PySide6>=6.6.0",
+    "opencv-python>=4.8.0",
+    "mediapipe>=0.10.0",
+    "pywin32>=306; sys_platform == 'win32'",
 ]
 
 [project.optional-dependencies]
+# Runtime stack (GUI + camera + AI). Cross-platform: pip selects the native wheel
+# for macOS or Windows. Windows OS integration uses stdlib ctypes (no pywin32 needed).
+#   pip install -e ".[app,dev]"
+app = [
+    "PySide6>=6.6.0",
+    "opencv-python>=4.8.0",
+    "mediapipe>=0.10.14",
+]
 dev = [
     "pytest>=8.0.0",
+    "pytest-qt>=4.4.0",
     "mypy>=1.10.0",
     "ruff>=0.5.0",
 ]
@@ -73,6 +84,10 @@ module = [
     "cv2.*",
     "objc.*",
     "AppKit.*",
+    "win32.*",
+    "win32gui.*",
+    "win32con.*",
+    "win32process.*",
 ]
 ignore_missing_imports = true
 

@@ -11,6 +11,7 @@ Implements:
 import contextlib
 import math
 import os
+import tempfile
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -47,7 +48,8 @@ class SequentialLandmarkDetector:
 
     def _init_mediapipe(self) -> None:
         """Initialize MediaPipe Pose Lite and Face Landmarker Tasks."""
-        os.environ.setdefault("MPLCONFIGDIR", "/tmp/matplotlib")
+        mpl_dir = os.path.join(tempfile.gettempdir(), "bapode_matplotlib")
+        os.environ.setdefault("MPLCONFIGDIR", mpl_dir)
         try:
             from scripts.download_models import ensure_models_exist
 

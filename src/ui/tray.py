@@ -8,6 +8,8 @@ Implements:
 4. Dashboard opener and graceful quit.
 """
 
+import sys
+
 from PySide6 import QtCore, QtGui, QtWidgets
 
 from tracker.states import OperatingMode, UIIntrusivenessLevel
@@ -73,9 +75,16 @@ class SystemTrayManager(QtCore.QObject):
     def show_startup_notification(self) -> None:
         """Display native OS notification banner confirming app is running in tray."""
         if self.tray_icon.isSystemTrayAvailable():
+            if sys.platform == "win32":
+                msg = (
+                    "Aplikasi aktif memantau di System Tray (kanan bawah). "
+                    "Klik kanan ikon untuk opsi."
+                )
+            else:
+                msg = "Aplikasi aktif memantau di Menu Bar (kanan atas). Klik ikon untuk opsi."
             self.tray_icon.showMessage(
                 "Bapode v3.0",
-                "Aplikasi aktif memantau di Menu Bar (kanan atas). Klik ikon untuk opsi.",
+                msg,
                 QtWidgets.QSystemTrayIcon.MessageIcon.Information,
                 3000,
             )
