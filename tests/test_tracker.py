@@ -306,3 +306,79 @@ class TestPostureEscalationController:
         # Now 3 alerts in rolling 10-minute window -> escalates to MICROBREAK_PROMPT!
         assert states["fhp"].alert_count_10m >= 3
         assert ui == UIIntrusivenessLevel.MICROBREAK_PROMPT
+
+    def test_microbreak_expires_after_duration_and_resets_history(self) -> None:
+        """MICROBREAK_PROMPT must automatically end after 60s and clear rolling triggers."""
+        controller = PostureEscalationController(
+            cooldown_s=30.0,
+            warn_threshold_s=7.5,
+            microbreak_duration_s=60.0,
+        )
+        dt = 0.2
+        curr_t = 0.0
+
+        # Trigger 3 alerts separated by upright recovery + cooldown
+        for alert_idx in range(3):
+            for _ in range(85):
+                curr_t += dt
+                ui, _, _ = controller.update(
+                    d_fhp=0.20,
+                    d_neck=0.0,
+                    d_slump=0.0,
+                    d_pitch=0.0,
+                    d_tilt=0.0,
+                    dt=dt,
+                    is_moving=False,
+                    current_time=curr_t,
+                )
+            if alert_idx < 2:
+                # Recover and wait past 30s cooldown
+                for _ in range(180):
+                    curr_t += dt
+                    controller.update(
+                        d_fhp=0.0,
+                        d_neck=0.0,
+                        d_slump=0.0,
+                        d_pitch=0.0,
+                        d_tilt=0.0,
+                        dt=dt,
+                        is_moving=False,
+                        current_time=curr_t,
+                    )
+
+        assert controller.is_microbreak_active is True
+        assert controller.microbreak_remaining_s > 0.0
+
+        # Stay upright for 59.0s -> still in MICROBREAK_PROMPT
+        for _ in range(290):
+            curr_t += dt
+            ui, _, _ = controller.update(
+                d_fhp=0.0,
+                d_neck=0.0,
+                d_slump=0.0,
+                d_pitch=0.0,
+                d_tilt=0.0,
+                dt=dt,
+                is_moving=False,
+                current_time=curr_t,
+            )
+            if not controller.is_microbreak_active:
+                break
+
+        # Advance past 60.0s total -> microbreak completes and returns to SILENT_OK
+        for _ in range(20):
+            curr_t += dt
+            ui, _, states = controller.update(
+                d_fhp=0.0,
+                d_neck=0.0,
+                d_slump=0.0,
+                d_pitch=0.0,
+                d_tilt=0.0,
+                dt=dt,
+                is_moving=False,
+                current_time=curr_t,
+            )
+
+        assert controller.is_microbreak_active is False
+        assert ui == UIIntrusivenessLevel.SILENT_OK
+        assert states["fhp"].alert_count_10m == 0

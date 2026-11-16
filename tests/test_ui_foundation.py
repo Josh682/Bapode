@@ -475,3 +475,50 @@ class TestGuidedCalibrationFixes:
         worker._process_calibration_tick(img, steady_pose, [steady_face])
         assert progress_events[-1][0] == 0
         mgr.close()
+
+    def test_hud_microbreak_countdown_and_auto_dismiss(
+        self, qapp: QtWidgets.QApplication
+    ) -> None:
+        del qapp
+        overlay = HUDOverlay()
+        overlay.on_state_changed(
+            "ACTIVE_MONITORING",
+            "MEASURABLE",
+            "MICROBREAK_PROMPT",
+            PostureViolationFlags(),
+        )
+        assert overlay.isVisible()
+        assert overlay._microbreak_timer.isActive()
+        assert "60s" in overlay._badge_text
+        assert overlay._badge_color.name().upper() == ColorTokens.STATUS_INFO
+
+        # Sync backend remaining seconds when drift >= 2s
+        overlay.sync_microbreak_remaining(45.0)
+        assert "45s" in overlay._badge_text
+
+        # Simulate remaining 44 seconds ticking down to 1s
+        for _ in range(44):
+            overlay._on_microbreak_tick()
+        assert "1s" in overlay._badge_text
+        assert overlay._microbreak_active is True
+
+        # Final tick hits 0s -> stops countdown, shows green completion, auto-hides in 3s
+        overlay._on_microbreak_tick()
+        assert not overlay._microbreak_timer.isActive()
+        assert overlay._microbreak_active is False
+        assert "Peregangan Selesai" in overlay._badge_text
+        assert overlay._badge_color.name().upper() == ColorTokens.STATUS_OK
+        assert overlay._auto_hide_timer.isActive()
+
+        # Backend transitioning to SILENT_OK does not break active auto-hide
+        overlay.on_state_changed(
+            "ACTIVE_MONITORING",
+            "MEASURABLE",
+            "SILENT_OK",
+            PostureViolationFlags(),
+        )
+        assert overlay._auto_hide_timer.isActive()
+
+        overlay._auto_hide_timer.timeout.emit()
+        assert overlay.isHidden()
+        overlay.close()

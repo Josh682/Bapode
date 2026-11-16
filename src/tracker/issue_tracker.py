@@ -209,14 +209,23 @@ class PostureEscalationController:
         warn_threshold_s: float = 7.5,
         duty_microbreak_threshold: float = 0.50,
         alerts_microbreak_count: int = 3,
+        microbreak_duration_s: float | None = None,
     ) -> None:
+        cfg = load_config()
         self.cooldown_s = cooldown_s
         self.warn_threshold_s = warn_threshold_s
         self.duty_microbreak_threshold = duty_microbreak_threshold
         self.alerts_microbreak_count = alerts_microbreak_count
+        self.microbreak_duration_s = (
+            float(microbreak_duration_s)
+            if microbreak_duration_s is not None
+            else float(cfg.tracker.microbreak_duration_s)
+        )
+        self._microbreak_active: bool = False
+        self._microbreak_started_time: float | None = None
+        self._last_eval_time: float = 0.0
 
         # Default hysteresis thresholds per metric (loaded from config.toml)
-        cfg = load_config()
         self.trackers: dict[str, IssueTracker] = {
             "fhp": IssueTracker(
                 tau_enter=cfg.metrics.tau_default_enter.get("fhp", 0.08),
@@ -241,9 +250,48 @@ class PostureEscalationController:
         }
 
     def reset(self) -> None:
-        """Reset all trackers."""
+        """Reset all trackers and active microbreak state."""
+        self._microbreak_active = False
+        self._microbreak_started_time = None
+        self._last_eval_time = 0.0
         for tracker in self.trackers.values():
             tracker.reset()
+
+    @property
+    def is_microbreak_active(self) -> bool:
+        """Return True when a 60s microbreak countdown episode is underway."""
+        return self._microbreak_active
+
+    @property
+    def microbreak_remaining_s(self) -> float:
+        """Remaining seconds in the active microbreak episode, or 0.0 if inactive."""
+        if not self._microbreak_active or self._microbreak_started_time is None:
+            return 0.0
+        elapsed = max(0.0, self._last_eval_time - self._microbreak_started_time)
+        return max(0.0, self.microbreak_duration_s - elapsed)
+
+    def check_microbreak_expiry(self, current_time: float) -> bool:
+        """Complete an active microbreak after microbreak_duration_s and reset triggers.
+
+        Returns:
+            True if an active microbreak just expired on this tick.
+        """
+        self._last_eval_time = current_time
+        if not self._microbreak_active or self._microbreak_started_time is None:
+            return False
+        if (current_time - self._microbreak_started_time) < self.microbreak_duration_s:
+            return False
+
+        self._microbreak_active = False
+        self._microbreak_started_time = None
+        for tracker in self.trackers.values():
+            tracker.alert_history.clear()
+            tracker.samples_history.clear()
+            tracker.bucket_s = 0.0
+            tracker.is_violating = False
+            tracker.alert_active = False
+            tracker.last_alert_dismissed_time = current_time
+        return True
 
     def update(
         self,
@@ -278,6 +326,23 @@ class PostureEscalationController:
             v_tilt=states["tilt"].is_violating,
         )
 
+        self._last_eval_time = current_time
+        if self.check_microbreak_expiry(current_time):
+            states = {
+                name: IssueTrackerState(
+                    filtered_deviation=st.filtered_deviation,
+                    is_violating=False,
+                    bucket_s=0.0,
+                    alert_active=False,
+                    is_gate_frozen=st.is_gate_frozen,
+                    alert_count_10m=0,
+                    duty_cycle_15m=0.0,
+                )
+                for name, st in states.items()
+            }
+            flags = PostureViolationFlags()
+            return UIIntrusivenessLevel.SILENT_OK, flags, states
+
         ui_level = self._evaluate_ui_level(states, current_time)
         return ui_level, flags, states
 
@@ -287,7 +352,11 @@ class PostureEscalationController:
         current_time: float,
     ) -> UIIntrusivenessLevel:
         """Determine UI level based on alerts, cooldowns, and microbreak conditions."""
-        # 1. Micro-break Escalation:
+        self._last_eval_time = current_time
+        # 1. Micro-break Escalation (bounded to microbreak_duration_s, default 60s):
+        if self._microbreak_active:
+            return UIIntrusivenessLevel.MICROBREAK_PROMPT
+
         # Check if any issue triggered >= 3 alerts in 10m window,
         # or combined 15m duty cycle exceeds threshold
         max_10m_alerts = max(state.alert_count_10m for state in states.values())
@@ -297,6 +366,8 @@ class PostureEscalationController:
             max_10m_alerts >= self.alerts_microbreak_count
             or max_15m_duty > self.duty_microbreak_threshold
         ):
+            self._microbreak_active = True
+            self._microbreak_started_time = current_time
             return UIIntrusivenessLevel.MICROBREAK_PROMPT
 
         # 2. Alert & Cooldown Evaluation

@@ -20,6 +20,9 @@ Implements:
 
 from __future__ import annotations
 
+import math
+
+from config import load_config
 from tracker.states import OperatingMode, PostureViolationFlags, UIIntrusivenessLevel
 from ui.platform_bridge import set_screen_share_protected, show_window_non_activating
 from ui.qt import QtCore, QtGui, QtWidgets
@@ -59,7 +62,13 @@ class HUDOverlay(QtWidgets.QWidget):
         self._current_op_mode = OperatingMode.ACTIVE_MONITORING
         self._badge_text = "Tegakkan Punggung & Leher"
         self._badge_color = QtGui.QColor(ColorTokens.STATUS_ALERT)
-        self._countdown_s: int = 60
+        self._default_microbreak_s: int = max(
+            1, int(round(load_config().tracker.microbreak_duration_s))
+        )
+        self._countdown_s: int = self._default_microbreak_s
+        self._microbreak_active: bool = False
+        self._microbreak_custom_msg: str = ""
+        self._microbreak_just_finished: bool = False
         self._extreme_close_active: bool = False
         self._showing_proximity_alert: bool = False
         self._recalib_notice_shown_for_episode: bool = False
@@ -68,6 +77,11 @@ class HUDOverlay(QtWidgets.QWidget):
         self._auto_hide_timer = QtCore.QTimer(self)
         self._auto_hide_timer.setSingleShot(True)
         self._auto_hide_timer.timeout.connect(self.hide)
+
+        # 1-second countdown timer for MICROBREAK_PROMPT
+        self._microbreak_timer = QtCore.QTimer(self)
+        self._microbreak_timer.setInterval(1000)
+        self._microbreak_timer.timeout.connect(self._on_microbreak_tick)
 
         self._init_window_properties()
 
@@ -168,15 +182,64 @@ class HUDOverlay(QtWidgets.QWidget):
             ):
                 self._show_recovery_badge()
 
-    def _show_recovery_badge(self) -> None:
-        """Show positive green confirmation for 5 seconds, then auto-hide."""
+    def _show_recovery_badge(
+        self,
+        text: str = "Postur Kembali Ideal",
+        duration_ms: int = 5000,
+    ) -> None:
+        """Show positive green confirmation, then auto-hide."""
         self._badge_color = QtGui.QColor(ColorTokens.STATUS_OK)
-        self._badge_text = "Postur Kembali Ideal"
+        self._badge_text = text
         self._fit_badge_width(self._badge_text)
         self._reposition_to_top_center()
         self.update()
         show_window_non_activating(self)
-        self._auto_hide_timer.start(5000)
+        self._auto_hide_timer.start(duration_ms)
+
+    def _stop_microbreak_timer(self) -> None:
+        """Stop microbreak countdown timer and clear active microbreak flag."""
+        if self._microbreak_timer.isActive():
+            self._microbreak_timer.stop()
+        self._microbreak_active = False
+        self._microbreak_custom_msg = ""
+
+    def _on_microbreak_tick(self) -> None:
+        """Decrement microbreak countdown every second and auto-dismiss at 0s."""
+        if not self._microbreak_active:
+            self._microbreak_timer.stop()
+            return
+
+        self._countdown_s = max(0, self._countdown_s - 1)
+        if self._countdown_s <= 0:
+            self._stop_microbreak_timer()
+            self._microbreak_just_finished = True
+            self._show_recovery_badge(
+                text="Peregangan Selesai — Lanjutkan Bekerja",
+                duration_ms=3000,
+            )
+            return
+
+        if not self._microbreak_custom_msg:
+            self._badge_text = f"Waktu Peregangan ({self._countdown_s}s)"
+            self._fit_badge_width(self._badge_text)
+            self.update()
+
+    @QtCore.Slot(float)
+    def sync_microbreak_remaining(self, remaining_s: float) -> None:
+        """Synchronize HUD microbreak countdown with backend elapsed timer."""
+        if not self._microbreak_active:
+            return
+        if remaining_s <= 0.0:
+            self._countdown_s = 0
+            self._on_microbreak_tick()
+            return
+        target_s = max(1, int(math.ceil(remaining_s)))
+        if abs(target_s - self._countdown_s) >= 2:
+            self._countdown_s = target_s
+            if not self._microbreak_custom_msg:
+                self._badge_text = f"Waktu Peregangan ({self._countdown_s}s)"
+                self._fit_badge_width(self._badge_text)
+                self.update()
 
     def update_state(
         self,
@@ -219,6 +282,8 @@ class HUDOverlay(QtWidgets.QWidget):
             OperatingMode.PAUSED_MEETING_AUTO,
             OperatingMode.CALIBRATING,
         ):
+            self._stop_microbreak_timer()
+            self._microbreak_just_finished = False
             self._showing_proximity_alert = False
             self._auto_hide_timer.stop()
             self.hide()
@@ -226,6 +291,8 @@ class HUDOverlay(QtWidgets.QWidget):
 
         # Setup drift / recalibration needed: show 5s passive violet notice once per episode
         if op_mode == OperatingMode.NEEDS_RECALIBRATION or ui_level_str == "NEEDS_RECALIBRATION":
+            self._stop_microbreak_timer()
+            self._microbreak_just_finished = False
             self._showing_proximity_alert = False
             if not self._recalib_notice_shown_for_episode:
                 self._recalib_notice_shown_for_episode = True
@@ -240,6 +307,8 @@ class HUDOverlay(QtWidgets.QWidget):
             return
 
         if level == UIIntrusivenessLevel.ACTIVE_OVERLAY:
+            self._stop_microbreak_timer()
+            self._microbreak_just_finished = False
             self._showing_proximity_alert = False
             self._auto_hide_timer.stop()
             self._badge_color = QtGui.QColor(ColorTokens.STATUS_ALERT)
@@ -249,16 +318,27 @@ class HUDOverlay(QtWidgets.QWidget):
             self.update()
             show_window_non_activating(self)
         elif level == UIIntrusivenessLevel.MICROBREAK_PROMPT:
+            if self._microbreak_just_finished:
+                return
             self._showing_proximity_alert = False
             self._auto_hide_timer.stop()
+            if not self._microbreak_active:
+                self._microbreak_active = True
+                self._countdown_s = self._default_microbreak_s
+                self._microbreak_custom_msg = message
+                self._microbreak_timer.start()
             self._badge_color = QtGui.QColor(ColorTokens.STATUS_INFO)
-            self._badge_text = message or f"Waktu Peregangan ({self._countdown_s}s)"
+            self._badge_text = (
+                self._microbreak_custom_msg or f"Waktu Peregangan ({self._countdown_s}s)"
+            )
             self._fit_badge_width(self._badge_text)
             self._reposition_to_top_center()
             self.update()
             show_window_non_activating(self)
         elif self._extreme_close_active:
             # Keep extreme close proximity warning active during OCCLUDED_LOWER
+            self._stop_microbreak_timer()
+            self._microbreak_just_finished = False
             self._showing_proximity_alert = True
             self._auto_hide_timer.stop()
             self._badge_color = QtGui.QColor(ColorTokens.STATUS_ALERT)
@@ -269,6 +349,10 @@ class HUDOverlay(QtWidgets.QWidget):
             show_window_non_activating(self)
         else:
             # Posture is now ideal (SILENT_OK, AMBIENT_WARN, SUPPRESSED_COOLDOWN)
+            self._stop_microbreak_timer()
+            if self._microbreak_just_finished:
+                self._microbreak_just_finished = False
+                return
             was_showing_alert = self.isVisible() and (
                 prev_level
                 in (

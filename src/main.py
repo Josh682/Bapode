@@ -97,6 +97,7 @@ class BapodeApp(QtCore.QObject):
         # Connect Worker 1 signals to UI
         self.vision_worker.state_changed.connect(self.tray_manager.update_status)
         self.vision_worker.state_changed.connect(self.hud_overlay.on_state_changed)
+        self.vision_worker.microbreak_triggered.connect(self.hud_overlay.sync_microbreak_remaining)
         self.vision_worker.state_changed.connect(self.dashboard_window.update_system_status)
         self.vision_worker.snooze_status_changed.connect(self.tray_manager.update_snooze_status)
         self.vision_worker.snooze_status_changed.connect(

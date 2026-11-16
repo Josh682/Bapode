@@ -418,7 +418,8 @@ class VisionTrackerWorker(QtCore.QThread):
             if snapshot.ui_level == UIIntrusivenessLevel.ACTIVE_OVERLAY:
                 self.alert_triggered.emit("ACTIVE_OVERLAY", 15.0)
             elif snapshot.ui_level == UIIntrusivenessLevel.MICROBREAK_PROMPT:
-                self.microbreak_triggered.emit(60.0)
+                remaining_mb = self.orchestrator.escalation_controller.microbreak_remaining_s
+                self.microbreak_triggered.emit(remaining_mb)
 
             # Check setup drift transition
             if snapshot.drift_detected:
