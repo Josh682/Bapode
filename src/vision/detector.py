@@ -42,6 +42,7 @@ class SequentialLandmarkDetector:
         self._pose_solution: Any = None
         self._face_solution: Any = None
         self._use_tasks_api: bool = False
+        self._last_timestamp_ms: int = -1
 
         if not self.use_mock:
             self._init_mediapipe()
@@ -58,9 +59,10 @@ class SequentialLandmarkDetector:
             from mediapipe.tasks import python
             from mediapipe.tasks.python import vision
 
-            # Pose Landmarker Lite Task
+            # Pose Landmarker Lite Task (VIDEO mode enables temporal landmark smoothing)
             pose_opts = vision.PoseLandmarkerOptions(
                 base_options=python.BaseOptions(model_asset_path=str(pose_path)),
+                running_mode=vision.RunningMode.VIDEO,
                 output_segmentation_masks=False,
                 min_pose_detection_confidence=0.5,
                 min_tracking_confidence=0.5,
@@ -68,9 +70,10 @@ class SequentialLandmarkDetector:
             )
             self._pose_landmarker = vision.PoseLandmarker.create_from_options(pose_opts)
 
-            # Face Landmarker Task with facial transformation matrixes
+            # Face Landmarker Task with facial transformation matrixes in VIDEO mode
             face_opts = vision.FaceLandmarkerOptions(
                 base_options=python.BaseOptions(model_asset_path=str(face_path)),
+                running_mode=vision.RunningMode.VIDEO,
                 output_facial_transformation_matrixes=True,
                 num_faces=3,
                 min_face_detection_confidence=0.5,
@@ -129,10 +132,12 @@ class SequentialLandmarkDetector:
 
             if self._use_tasks_api and self._pose_landmarker and self._face_landmarker:
                 mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_image)
+                ts_ms = max(self._last_timestamp_ms + 1, int(timestamp_s * 1000.0))
+                self._last_timestamp_ms = ts_ms
 
                 # 1. Pose Lite Task
                 pose_data: PoseLandmarkData | None = None
-                pose_res = self._pose_landmarker.detect(mp_image)
+                pose_res = self._pose_landmarker.detect_for_video(mp_image, ts_ms)
                 if pose_res.pose_landmarks and len(pose_res.pose_landmarks) > 0:
                     lms = pose_res.pose_landmarks[0]
                     left_sh = Point2D(lms[11].x * w, lms[11].y * h)
@@ -154,7 +159,7 @@ class SequentialLandmarkDetector:
 
                 # 2. Face Landmarker Task
                 detected_faces: list[FaceLandmarkData] = []
-                face_res = self._face_landmarker.detect(mp_image)
+                face_res = self._face_landmarker.detect_for_video(mp_image, ts_ms)
                 if face_res.face_landmarks:
                     matrices = getattr(face_res, "facial_transformation_matrixes", None)
                     for idx, face_lms in enumerate(face_res.face_landmarks):

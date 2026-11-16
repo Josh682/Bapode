@@ -241,15 +241,18 @@ class FrameAnnotator:
         is_plausible: bool,
         feedback: str,
     ) -> None:
-        """Draw silhouette guides and central instructions during calibration."""
-        guide_color = cls.COLOR_EMERALD if is_plausible else cls.COLOR_RED
-        cx, cy = w // 2, h // 2
+        """Draw ergonomic silhouette guides, gaze target, and clipped ASCII-safe prompt."""
+        guide_color = cls.COLOR_EMERALD if is_plausible else cls.COLOR_AMBER
+        cx = w // 2
+        head_cy = int(h * 0.30)
+        head_rx = max(36, int(h * 0.13))
+        head_ry = max(48, int(h * 0.17))
 
-        # Target head guide (ellipse)
+        # Target head guide (ellipse) positioned for plausible [0.35, 0.75] neck/shoulder ratio
         cv2.ellipse(
             canvas,
-            (cx, int(cy * 0.70)),
-            (int(w * 0.12), int(h * 0.22)),
+            (cx, head_cy),
+            (head_rx, head_ry),
             0,
             0,
             360,
@@ -258,9 +261,39 @@ class FrameAnnotator:
             cv2.LINE_AA,
         )
 
-        # Target shoulder guide (arc / line)
-        sh_y = int(cy * 1.30)
-        sh_half_w = int(w * 0.28)
+        # Center gaze focus reticle inside head guide so user looks straight forward
+        reticle_y = head_cy - int(head_ry * 0.12)
+        cv2.drawMarker(
+            canvas,
+            (cx, reticle_y),
+            cls.COLOR_CYAN,
+            cv2.MARKER_CROSS,
+            14,
+            1,
+            cv2.LINE_AA,
+        )
+
+        # Target shoulder guide: width ~0.56*h -> L_neck_ort / W_sh ~ 0.55 (center of [0.35, 0.75])
+        sh_y = int(h * 0.67)
+        sh_half_w = max(80, int(h * 0.28))
+        neck_half_w = max(24, int(h * 0.08))
+        neck_top_y = head_cy + head_ry
+        cv2.line(
+            canvas,
+            (cx - neck_half_w, neck_top_y),
+            (cx - sh_half_w, sh_y),
+            guide_color,
+            2,
+            cv2.LINE_AA,
+        )
+        cv2.line(
+            canvas,
+            (cx + neck_half_w, neck_top_y),
+            (cx + sh_half_w, sh_y),
+            guide_color,
+            2,
+            cv2.LINE_AA,
+        )
         cv2.line(
             canvas,
             (cx - sh_half_w, sh_y),
@@ -270,15 +303,47 @@ class FrameAnnotator:
             cv2.LINE_AA,
         )
 
-        # Center feedback prompt
-        msg = feedback if feedback else "Duduk tegak & tatap kamera"
+        # Compact ASCII-safe bottom pill inside the video frame
+        raw_msg = feedback if feedback else "Duduk tegak & tatap titik tengah"
+        safe_msg = (
+            raw_msg.replace("°", " deg")
+            .replace("—", "-")
+            .replace("±", "+/-")
+            .encode("ascii", errors="ignore")
+            .decode("ascii")
+        )
+        label = f"[{current}/{total}] {safe_msg}"
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        font_scale = 0.52
+        thickness = 1
+        max_text_w = max(120, w - 48)
+        while len(label) > 12:
+            (tw, th), _ = cv2.getTextSize(label, font, font_scale, thickness)
+            if tw <= max_text_w:
+                break
+            label = label[:-4] + "..."
+
+        (tw, th), _ = cv2.getTextSize(label, font, font_scale, thickness)
+        text_x = max(16, (w - tw) // 2)
+        text_y = int(h * 0.92)
+        pad_x, pad_y = 12, 8
+
+        overlay = canvas.copy()
+        cv2.rectangle(
+            overlay,
+            (text_x - pad_x, text_y - th - pad_y),
+            (text_x + tw + pad_x, text_y + pad_y),
+            cls.COLOR_DARK,
+            -1,
+        )
+        cv2.addWeighted(overlay, 0.72, canvas, 0.28, 0, canvas)
         cv2.putText(
             canvas,
-            f"{msg} ({current}/{total})",
-            (max(20, cx - 220), int(h * 0.92)),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.65,
+            label,
+            (text_x, text_y),
+            font,
+            font_scale,
             guide_color,
-            2,
+            thickness,
             cv2.LINE_AA,
         )
