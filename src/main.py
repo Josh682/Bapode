@@ -20,6 +20,7 @@ from ui.dashboard import GuidedCalibrationDialog, SessionTrendDashboard
 from ui.overlay import HUDOverlay
 from ui.platform_bridge import PlatformPowerListener, set_application_activation_policy
 from ui.qt import QtCore, QtWidgets
+from ui.theme import apply_app_theme
 from ui.tray import SystemTrayManager
 from vision.detector import SequentialLandmarkDetector
 from vision.worker import VisionTrackerWorker
@@ -95,11 +96,23 @@ class BapodeApp(QtCore.QObject):
 
         # Connect Worker 1 signals to UI
         self.vision_worker.state_changed.connect(self.tray_manager.update_status)
-        self.vision_worker.state_changed.connect(
-            lambda op, vis, ui, flags: (
-                self.hud_overlay.update_state(ui) if self.hud_overlay else None
-            )
+        self.vision_worker.state_changed.connect(self.hud_overlay.on_state_changed)
+        self.vision_worker.microbreak_triggered.connect(self.hud_overlay.sync_microbreak_remaining)
+        self.vision_worker.state_changed.connect(self.dashboard_window.update_system_status)
+        self.vision_worker.snooze_status_changed.connect(self.tray_manager.update_snooze_status)
+        self.vision_worker.snooze_status_changed.connect(
+            self.dashboard_window.update_snooze_status
         )
+        self.vision_worker.environment_alerts_changed.connect(
+            self.tray_manager.update_environment_status
+        )
+        self.vision_worker.environment_alerts_changed.connect(
+            self.hud_overlay.update_environment_status
+        )
+        self.vision_worker.environment_alerts_changed.connect(
+            self.dashboard_window.update_environment_status
+        )
+        self.vision_worker.drift_detected.connect(self.dashboard_window.on_drift_detected)
         self.vision_worker.calibration_progress.connect(self.calib_dialog.update_progress)
         self.vision_worker.calibration_completed.connect(self._on_calibration_completed)
         self.vision_worker.live_telemetry.connect(self.dashboard_window.update_live_telemetry)
@@ -113,9 +126,7 @@ class BapodeApp(QtCore.QObject):
 
         # Connect Calibration dialog actions
         self.calib_dialog.quit_requested.connect(self.shutdown)
-        self.calib_dialog.rejected.connect(
-            lambda: set_application_activation_policy(is_accessory=True)
-        )
+        self.calib_dialog.rejected.connect(self._on_calibration_cancelled)
 
         # Connect Tray actions
         self.tray_manager.recalibrate_requested.connect(self._start_calibration_flow)
@@ -141,6 +152,11 @@ class BapodeApp(QtCore.QObject):
             self.calib_dialog.accept()
         set_application_activation_policy(is_accessory=True)
 
+    def _on_calibration_cancelled(self) -> None:
+        """Restore prior monitoring mode when user cancels or closes calibration."""
+        self.vision_worker.cancel_calibration()
+        set_application_activation_policy(is_accessory=True)
+
     def _open_dashboard(self) -> None:
         """Open or focus dashboard window."""
         if self.dashboard_window is not None:
@@ -164,8 +180,15 @@ class BapodeApp(QtCore.QObject):
             print("\n" + "=" * 80)
             print(" Bapode v3.0 Berjalan di Latar Belakang (Background Utility)")
             print("=" * 80)
-            print(" • Status Icon : Periksa Menu Bar macOS di pojok kanan atas (lingkaran hijau)")
-            print(" • Menu Aksi   : Klik ikon Menu Bar untuk:")
+            if sys.platform == "win32":
+                print(
+                    " • Status Icon : Periksa System Tray Windows di kanan bawah "
+                    "(lingkaran hijau)"
+                )
+                print(" • Menu Aksi   : Klik kanan ikon System Tray untuk:")
+            else:
+                print(" • Status Icon : Periksa Menu Bar macOS di pojok kanan atas (lingkaran hijau)")
+                print(" • Menu Aksi   : Klik ikon Menu Bar untuk:")
             print("                 - Buka Dashboard Sesi & Tren Historis")
             print("                 - Kalibrasi Ulang (3 Detik)")
             print("                 - Jeda Pemantauan (Snooze 15 / 30 / 60 Menit)")
@@ -274,8 +297,31 @@ class BapodeApp(QtCore.QObject):
 PostureGuardianApp = BapodeApp
 
 
+def _enable_windows_ansi_console() -> None:
+    """Enable UTF-8 output and ANSI/VT100 escape sequences on Windows consoles."""
+    if sys.platform != "win32":
+        return
+    try:
+        if hasattr(sys.stdout, "reconfigure"):
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        if hasattr(sys.stderr, "reconfigure"):
+            sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+        import ctypes
+
+        kernel32 = ctypes.windll.kernel32
+        handle = kernel32.GetStdHandle(-11)  # STD_OUTPUT_HANDLE
+        mode = ctypes.c_uint32()
+        if kernel32.GetConsoleMode(handle, ctypes.byref(mode)):
+            # ENABLE_VIRTUAL_TERMINAL_PROCESSING = 0x0004
+            kernel32.SetConsoleMode(handle, mode.value | 0x0004)
+    except Exception:
+        pass
+
+
 def main() -> int:
     """CLI bootstrap and entry point."""
+    if sys.platform == "win32":
+        _enable_windows_ansi_console()
     parser = argparse.ArgumentParser(description="Bapode v3.0 Desktop Application")
     parser.add_argument(
         "--mock-camera", action="store_true", help="Run with synthetic camera frames"
@@ -312,6 +358,7 @@ def main() -> int:
     # Don't quit when calibration dialog or dashboard closes
     if isinstance(app, QtWidgets.QApplication):
         app.setQuitOnLastWindowClosed(False)
+        apply_app_theme(app)
 
     coordinator = BapodeApp(
         db_path=args.db_path,

@@ -371,6 +371,8 @@ class SessionOrchestrator:
         else:
             # Active monitoring mode
             self.visibility_state = visibility
+            if visibility != VisibilityState.MEASURABLE:
+                self.escalation_controller.check_microbreak_expiry(t_sec)
 
             if visibility == VisibilityState.ABSENT:
                 self.absent_seconds += dt_safe

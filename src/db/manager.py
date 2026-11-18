@@ -212,6 +212,26 @@ class DatabaseManager:
                 raise RuntimeError("Failed to obtain profile_id after insert.")
             return profile_id
 
+    @staticmethod
+    def _row_to_calibration_profile(row: sqlite3.Row) -> CalibrationProfileRecord:
+        """Convert a SQLite row into a CalibrationProfileRecord."""
+        return CalibrationProfileRecord(
+            profile_id=row["profile_id"],
+            created_at=row["created_at"],
+            base_neck_ort_ratio=row["base_neck_ort_ratio"],
+            base_eye_sh_ratio=row["base_eye_sh_ratio"],
+            base_sh_width_px=row["base_sh_width_px"],
+            base_sh_y_mid=row["base_sh_y_mid"],
+            base_sh_angle_deg=row["base_sh_angle_deg"],
+            base_head_pitch_deg=row["base_head_pitch_deg"],
+            base_head_roll_deg=row["base_head_roll_deg"],
+            sigma_fhp=row["sigma_fhp"],
+            sigma_neck=row["sigma_neck"],
+            sigma_slump=row["sigma_slump"],
+            sigma_pitch=row["sigma_pitch"],
+            sigma_tilt=row["sigma_tilt"],
+        )
+
     def get_calibration_profile(self, profile_id: int) -> CalibrationProfileRecord | None:
         """Fetch calibration profile by ID."""
         with self._lock:
@@ -223,22 +243,19 @@ class DatabaseManager:
             row = cursor.fetchone()
             if not row:
                 return None
-            return CalibrationProfileRecord(
-                profile_id=row["profile_id"],
-                created_at=row["created_at"],
-                base_neck_ort_ratio=row["base_neck_ort_ratio"],
-                base_eye_sh_ratio=row["base_eye_sh_ratio"],
-                base_sh_width_px=row["base_sh_width_px"],
-                base_sh_y_mid=row["base_sh_y_mid"],
-                base_sh_angle_deg=row["base_sh_angle_deg"],
-                base_head_pitch_deg=row["base_head_pitch_deg"],
-                base_head_roll_deg=row["base_head_roll_deg"],
-                sigma_fhp=row["sigma_fhp"],
-                sigma_neck=row["sigma_neck"],
-                sigma_slump=row["sigma_slump"],
-                sigma_pitch=row["sigma_pitch"],
-                sigma_tilt=row["sigma_tilt"],
+            return self._row_to_calibration_profile(row)
+
+    def get_latest_calibration_profile(self) -> CalibrationProfileRecord | None:
+        """Fetch the most recently saved calibration profile, if any."""
+        with self._lock:
+            conn = self.connect()
+            cursor = conn.execute(
+                "SELECT * FROM calibration_profiles ORDER BY profile_id DESC LIMIT 1"
             )
+            row = cursor.fetchone()
+            if not row:
+                return None
+            return self._row_to_calibration_profile(row)
 
     # --------------------------------------------------------------------------
     # 2. Monitoring Sessions & Adherence Bounds

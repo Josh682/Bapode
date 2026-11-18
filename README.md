@@ -24,6 +24,39 @@ Berbeda dari aplikasi pengingat postur konvensional yang sering mengganggu fokus
 
 ---
 
+## ⚡ Panduan Cepat Menjalankan di Windows (Quickstart)
+
+Bapode v3.0 telah dioptimalkan secara penuh untuk sistem operasi **Windows 10 & 11** dengan dukungan akselerasi webcam DirectShow, perlindungan privasi rapat via Win32 `SetWindowDisplayAffinity`, dan *sleep/wake event hooks*.
+
+### 1. Setup Lingkungan Otomatis (Pertama Kali)
+Cukup jalankan script batch otomatis:
+```cmd
+setup_windows.bat
+```
+Script ini akan secara otomatis:
+- Membuat *virtual environment* Python (`.venv`) jika belum ada.
+- Menginstall seluruh dependensi (`PySide6`, `opencv-python`, `mediapipe`, `numpy`, `pywin32`).
+- Mengunduh model Google MediaPipe (`pose_landmarker_lite.task` & `face_landmarker.task`) ke folder `models/`.
+
+### 2. Menjalankan Aplikasi
+Pilih salah satu cara termudah:
+- **Double-Click:** Klik dua kali file `run.bat` di Windows Explorer.
+- **PowerShell:** Jalankan `.\run.ps1`
+- **Command Prompt:** Jalankan `run.bat`
+
+```cmd
+# Menjalankan dengan antarmuka grafis (Default):
+run.bat
+
+# Menjalankan langsung membuka dashboard:
+run.bat --show-dashboard
+
+# Menjalankan kalibrasi 3 detik saat start:
+run.bat --calibrate
+```
+
+---
+
 ## 2. Fitur-Fitur Utama
 
 ### 🧠 Computer Vision & 5 Metrik Geometris Satu Arah

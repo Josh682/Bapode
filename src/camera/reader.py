@@ -10,6 +10,7 @@ Implements:
 
 import contextlib
 import queue
+import sys
 import threading
 import time
 from collections.abc import Callable
@@ -64,10 +65,14 @@ class CameraReader(threading.Thread):
             try:
                 import cv2
 
-                cap = cv2.VideoCapture(self.camera_index)
-                cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.frame_width)
-                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.frame_height)
-                cap.set(cv2.CAP_PROP_FPS, self.target_fps)
+                if sys.platform == "win32":
+                    # Windows: force DirectShow backend to avoid MSMF lag/freeze
+                    cap = self._open_windows_capture(cv2)
+                else:
+                    cap = cv2.VideoCapture(self.camera_index)
+                    cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.frame_width)
+                    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.frame_height)
+                    cap.set(cv2.CAP_PROP_FPS, self.target_fps)
                 if not cap.isOpened():
                     # Fallback to mock mode if camera cannot be opened
                     self.mock_mode = True
@@ -106,6 +111,31 @@ class CameraReader(threading.Thread):
             if cap is not None:
                 with contextlib.suppress(Exception):
                     cap.release()
+
+    def _open_windows_capture(self, cv2: Any) -> Any:
+        """Open the camera on Windows using the DirectShow backend (cv2.CAP_DSHOW).
+
+        The default Media Foundation (MSMF) backend frequently takes several seconds
+        to open, buffers stale frames, or freezes on many UVC webcams. DirectShow
+        opens quickly and always returns the most recent frame. If DirectShow cannot
+        open the device, fall back to MSMF so the camera remains usable.
+        """
+        cap = cv2.VideoCapture(self.camera_index, cv2.CAP_DSHOW)
+        if not cap.isOpened():
+            with contextlib.suppress(Exception):
+                cap.release()
+            cap = cv2.VideoCapture(self.camera_index, cv2.CAP_MSMF)
+
+        if cap.isOpened():
+            # FOURCC must be set before resolution under DirectShow. MJPG lets most
+            # webcams deliver 1280x720 over USB 2.0; unsupported devices ignore it.
+            cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.frame_width)
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.frame_height)
+            cap.set(cv2.CAP_PROP_FPS, self.target_fps)
+            # Keep driver-side buffering minimal so 5 FPS reads stay fresh
+            cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        return cap
 
     def _push_latest_frame(self, frame: CameraFrame) -> None:
         """Push frame into queue, evicting any old frame if queue is full."""

@@ -6,6 +6,7 @@ Renders live 5 FPS annotated video frames with smooth aspect ratio scaling.
 from __future__ import annotations
 
 from ui.qt import QtCore, QtGui, QtWidgets
+from ui.theme import ColorTokens
 
 
 class CameraPreviewWidget(QtWidgets.QFrame):
@@ -14,12 +15,12 @@ class CameraPreviewWidget(QtWidgets.QFrame):
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
         super().__init__(parent)
         self.setStyleSheet(
-            """
-            CameraPreviewWidget {
-                background-color: #0F172A;
-                border: 1px solid #334155;
+            f"""
+            CameraPreviewWidget {{
+                background-color: {ColorTokens.BG_CANVAS};
+                border: 1px solid {ColorTokens.BORDER_STRONG};
                 border-radius: 12px;
-            }
+            }}
             """
         )
         self.setMinimumSize(480, 270)
@@ -29,7 +30,9 @@ class CameraPreviewWidget(QtWidgets.QFrame):
 
         self.video_label = QtWidgets.QLabel()
         self.video_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-        self.video_label.setStyleSheet("background: transparent; color: #94A3B8; font-size: 14px;")
+        self.video_label.setStyleSheet(
+            f"background: transparent; color: {ColorTokens.TEXT_SECONDARY}; font-size: 14px;"
+        )
         self.video_label.setText("📷 Menunggu Feed Webcam...")
         layout.addWidget(self.video_label)
 

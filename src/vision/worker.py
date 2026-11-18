@@ -17,9 +17,14 @@ from datetime import datetime
 import numpy as np
 
 from camera.reader import CameraFrame
+from config import load_config
 from db.manager import CalibrationProfileRecord
 from db.worker import DatabaseWorker
-from tracker.calibration import CalibrationEngine
+from tracker.calibration import (
+    LOW_LIGHT_WARNING_MESSAGE,
+    CalibrationEngine,
+    PlausibilityGateLimits,
+)
 from tracker.filter import NormalizedVelocityDetector
 from tracker.states import (
     OperatingMode,
@@ -51,6 +56,7 @@ class VisionTrackerWorker(QtCore.QThread):
     calibration_completed = QtCore.Signal(object)  # CalibrationProfileRecord
     drift_detected = QtCore.Signal(str)  # drift description
     snooze_status_changed = QtCore.Signal(bool, float)  # is_snoozed, remaining_s
+    environment_alerts_changed = QtCore.Signal(bool, bool, str)  # low_light, extreme_close, msg
     live_telemetry = QtCore.Signal(dict)  # Live telemetry for threshold tuning
     frame_annotated = QtCore.Signal(QtGui.QImage)  # Live annotated camera feed for GUI
 
@@ -67,7 +73,18 @@ class VisionTrackerWorker(QtCore.QThread):
         self.detector = detector or SequentialLandmarkDetector()
 
         # Calibration & Orchestrator
-        self.calibration_engine = CalibrationEngine()
+        cal_cfg = load_config().calibration
+        self.calibration_engine = CalibrationEngine(
+            target_samples=cal_cfg.target_samples,
+            limits=PlausibilityGateLimits(
+                max_abs_yaw_deg=cal_cfg.yaw_head_limit_deg,
+                max_abs_roll_deg=cal_cfg.roll_head_limit_deg,
+                max_abs_theta_sh_deg=cal_cfg.shoulder_tilt_limit_deg,
+                min_neck_ratio=cal_cfg.neck_ratio_min,
+                max_neck_ratio=cal_cfg.neck_ratio_max,
+            ),
+            mad_rejection_factor=cal_cfg.mad_rejection_factor,
+        )
         self.visibility_evaluator = VisibilityEvaluator()
         self.velocity_detector = NormalizedVelocityDetector()
         self.orchestrator: SessionOrchestrator | None = None
@@ -77,6 +94,11 @@ class VisionTrackerWorker(QtCore.QThread):
         self._running = True
         self._snooze_until: float = 0.0
         self._manual_calibrating = False
+        self._calib_invalid_streak: int = 0
+        self._calib_error_cooldown_ticks: int = 0
+        self._calib_last_error_msg: str = ""
+        self._pre_calib_mode: OperatingMode = OperatingMode.ACTIVE_MONITORING
+        self._last_env_alerts: tuple[bool, bool] = (False, False)
 
     def stop(self) -> None:
         """Stop worker loop."""
@@ -113,9 +135,34 @@ class VisionTrackerWorker(QtCore.QThread):
     def trigger_calibration(self) -> None:
         """Start 3-second guided calibration sequence."""
         self._manual_calibrating = True
+        self._calib_invalid_streak = 0
+        self._calib_error_cooldown_ticks = 0
+        self._calib_last_error_msg = ""
         self.calibration_engine.reset()
+        self._emit_environment_alerts(False, False)
         if self.orchestrator is not None:
+            if self.orchestrator.operating_mode != OperatingMode.CALIBRATING:
+                self._pre_calib_mode = self.orchestrator.operating_mode
             self.orchestrator.operating_mode = OperatingMode.CALIBRATING
+            self._emit_current_state()
+
+    def cancel_calibration(self) -> None:
+        """Abort calibration sequence and restore previous non-calibrating mode."""
+        self._manual_calibrating = False
+        self._calib_invalid_streak = 0
+        self._calib_error_cooldown_ticks = 0
+        self._calib_last_error_msg = ""
+        self.calibration_engine.reset()
+        if (
+            self.orchestrator is not None
+            and self.orchestrator.operating_mode == OperatingMode.CALIBRATING
+        ):
+            restore_mode = (
+                self._pre_calib_mode
+                if self._pre_calib_mode != OperatingMode.CALIBRATING
+                else OperatingMode.ACTIVE_MONITORING
+            )
+            self.orchestrator.operating_mode = restore_mode
             self._emit_current_state()
 
     def set_snooze(self, minutes: int) -> None:
@@ -129,6 +176,7 @@ class VisionTrackerWorker(QtCore.QThread):
             self._snooze_until = time.monotonic() + (minutes * 60.0)
             if self.orchestrator is not None:
                 self.orchestrator.operating_mode = OperatingMode.PAUSED_MANUAL
+            self._emit_environment_alerts(False, False)
             self.snooze_status_changed.emit(True, float(minutes * 60))
         self._emit_current_state()
 
@@ -161,8 +209,8 @@ class VisionTrackerWorker(QtCore.QThread):
         # Initialize default session in SQLite if needed
         session_id = self.db_worker.db_manager.create_session()
 
-        # Ensure at least one base calibration profile exists for FK constraints
-        profile = self.db_worker.db_manager.get_calibration_profile(1)
+        # Load latest saved calibration profile or seed default profile for FK constraints
+        profile = self.db_worker.db_manager.get_latest_calibration_profile()
         if profile is None:
             default_rec = CalibrationProfileRecord(
                 profile_id=None,
@@ -181,17 +229,18 @@ class VisionTrackerWorker(QtCore.QThread):
                 sigma_tilt=1.0,
             )
             profile_id = self.db_worker.db_manager.save_calibration_profile(default_rec)
+            profile = self.db_worker.db_manager.get_calibration_profile(profile_id) or default_rec
         else:
             profile_id = profile.profile_id or 1
 
         ref = CalibrationReference(
-            base_neck_ort_ratio=0.60,
-            base_eye_sh_ratio=0.30,
-            base_sh_width_px=200.0,
-            base_sh_y_mid=400.0,
-            base_sh_angle_deg=0.0,
-            base_head_pitch_deg=0.0,
-            base_head_roll_deg=0.0,
+            base_neck_ort_ratio=profile.base_neck_ort_ratio,
+            base_eye_sh_ratio=profile.base_eye_sh_ratio,
+            base_sh_width_px=profile.base_sh_width_px,
+            base_sh_y_mid=profile.base_sh_y_mid,
+            base_sh_angle_deg=profile.base_sh_angle_deg,
+            base_head_pitch_deg=profile.base_head_pitch_deg,
+            base_head_roll_deg=profile.base_head_roll_deg,
         )
 
         self.orchestrator = SessionOrchestrator(
@@ -200,6 +249,7 @@ class VisionTrackerWorker(QtCore.QThread):
             profile_id=profile_id,
             ref=ref,
         )
+        self.set_active_profile(profile)
 
         prev_timestamp = time.monotonic()
 
@@ -258,7 +308,7 @@ class VisionTrackerWorker(QtCore.QThread):
                 if base_eye > 1e-4:
                     w_eye_ratio = w_eye_corr / base_eye
 
-            vis_state, _ = self.visibility_evaluator.evaluate(
+            vis_state, is_extreme_close = self.visibility_evaluator.evaluate(
                 has_face=has_face,
                 has_shoulders=has_shoulders,
                 w_eye_ratio=w_eye_ratio,
@@ -313,6 +363,11 @@ class VisionTrackerWorker(QtCore.QThread):
                 )
                 self.metrics_calculated.emit(metrics, current_mono)
 
+            is_active_monitoring = snapshot.operating_mode == OperatingMode.ACTIVE_MONITORING
+            effective_low_light = bool(snapshot.low_light_warning and is_active_monitoring)
+            effective_extreme_close = bool(is_extreme_close and is_active_monitoring)
+            self._emit_environment_alerts(effective_low_light, effective_extreme_close)
+
             # Emit live telemetry for calibration and empirical tuning (Bab 8)
             d_hats: dict[str, float] = {}
             buckets: dict[str, float] = {}
@@ -327,6 +382,8 @@ class VisionTrackerWorker(QtCore.QThread):
                 "ui_level": snapshot.ui_level.value,
                 "is_moving": is_moving,
                 "v_norm": v_norm,
+                "low_light_warning": effective_low_light,
+                "extreme_close_proximity": effective_extreme_close,
                 "d_hat": d_hats,
                 "sigmas": dict(self.orchestrator.noise_adapter.current_sigmas),
                 "tau_enter": dict(self.orchestrator.noise_adapter.effective_thresholds),
@@ -361,13 +418,50 @@ class VisionTrackerWorker(QtCore.QThread):
             if snapshot.ui_level == UIIntrusivenessLevel.ACTIVE_OVERLAY:
                 self.alert_triggered.emit("ACTIVE_OVERLAY", 15.0)
             elif snapshot.ui_level == UIIntrusivenessLevel.MICROBREAK_PROMPT:
-                self.microbreak_triggered.emit(60.0)
+                remaining_mb = self.orchestrator.escalation_controller.microbreak_remaining_s
+                self.microbreak_triggered.emit(remaining_mb)
 
-            # Check setup drift
-            if snapshot.operating_mode == OperatingMode.NEEDS_RECALIBRATION:
+            # Check setup drift transition
+            if snapshot.drift_detected:
                 self.drift_detected.emit(
-                    "Setup drift terdeteksi (posisi kursi atau engsel layar berubah)."
+                    snapshot.drift_reason
+                    or "Setup drift terdeteksi (posisi kursi atau engsel layar berubah)."
                 )
+
+    def _format_calibration_guidance(
+        self,
+        face: FaceLandmarkData,
+        neck_ratio: float,
+        theta_sh_deg: float,
+    ) -> str:
+        """Translate plausibility gate limits into actionable Indonesian user cues."""
+        limits = self.calibration_engine.limits
+        if abs(face.yaw_deg) > limits.max_abs_yaw_deg:
+            return (
+                f"Hadapkan wajah lurus ke depan (menoleh {face.yaw_deg:+.1f}°, "
+                f"batas ±{limits.max_abs_yaw_deg:.0f}°)."
+            )
+        if abs(face.roll_deg) > limits.max_abs_roll_deg:
+            return (
+                f"Tegakkan kepala agar tidak miring ({face.roll_deg:+.1f}°, "
+                f"batas ±{limits.max_abs_roll_deg:.0f}°)."
+            )
+        if abs(theta_sh_deg) > limits.max_abs_theta_sh_deg:
+            return (
+                f"Sejajarkan bahu kanan & kiri (miring {theta_sh_deg:+.1f}°, "
+                f"batas ±{limits.max_abs_theta_sh_deg:.0f}°)."
+            )
+        if neck_ratio < limits.min_neck_ratio:
+            return (
+                f"Duduk lebih tegak atau mundur sedikit agar leher & bahu terlihat "
+                f"(rasio {neck_ratio:.2f} < {limits.min_neck_ratio:.2f})."
+            )
+        if neck_ratio > limits.max_neck_ratio:
+            return (
+                f"Mundur sedikit atau sejajarkan posisi kepala dengan kamera "
+                f"(rasio {neck_ratio:.2f} > {limits.max_neck_ratio:.2f})."
+            )
+        return "Luruskan posisi wajah dan bahu di tengah kamera."
 
     def _process_calibration_tick(
         self,
@@ -377,46 +471,55 @@ class VisionTrackerWorker(QtCore.QThread):
     ) -> None:
         """Step guided 3-second calibration sequence."""
         target = self.calibration_engine.target_samples
+        img_w = (
+            float(image.shape[1])
+            if hasattr(image, "shape") and len(image.shape) >= 2
+            else 1280.0
+        )
+        face = associate_primary_subject(faces, pose, img_w / 2.0)
+        if face is None and len(faces) == 1:
+            face = faces[0]
 
-        if pose is None or not faces:
-            prompt = "Posisikan wajah dan bahu di depan kamera."
-            self.calibration_progress.emit(
-                len(self.calibration_engine.samples),
-                target,
-                False,
-                prompt,
-            )
-            self.frame_annotated.emit(
-                FrameAnnotator.annotate(
-                    image_bgr=image,
-                    pose=pose,
-                    face=faces[0] if faces else None,
-                    is_calibrating=True,
-                    calib_current=len(self.calibration_engine.samples),
-                    calib_total=target,
-                    calib_plausible=False,
-                    calib_feedback=prompt,
-                )
-            )
-            return
-
-        face = faces[0]
-        is_valid, reason, _ = self.calibration_engine.validate_sample_plausibility(pose, face)
-        if not is_valid:
-            prompt = reason or "Luruskan posisi tubuh..."
-            self.calibration_progress.emit(
-                len(self.calibration_engine.samples),
-                target,
-                False,
-                prompt,
-            )
+        if self._calib_error_cooldown_ticks > 0:
+            self._calib_error_cooldown_ticks -= 1
+            self.calibration_progress.emit(0, target, False, self._calib_last_error_msg)
             self.frame_annotated.emit(
                 FrameAnnotator.annotate(
                     image_bgr=image,
                     pose=pose,
                     face=face,
                     is_calibrating=True,
-                    calib_current=len(self.calibration_engine.samples),
+                    calib_current=0,
+                    calib_total=target,
+                    calib_plausible=False,
+                    calib_feedback=self._calib_last_error_msg,
+                )
+            )
+            return
+
+        if pose is None or face is None:
+            self._calib_invalid_streak += 1
+            if self._calib_invalid_streak >= 3:
+                self.calibration_engine.reset()
+            if face is not None and pose is None:
+                prompt = (
+                    "Bahu tidak terlihat — mundur sedikit atau miringkan kamera ke bawah "
+                    "agar kedua bahu masuk layar."
+                )
+            elif pose is not None and face is None:
+                prompt = "Wajah tidak terdeteksi — menghadap ke kamera & pastikan cahaya cukup."
+            else:
+                prompt = "Wajah dan bahu belum terlihat di depan kamera."
+
+            count = len(self.calibration_engine.samples)
+            self.calibration_progress.emit(count, target, False, prompt)
+            self.frame_annotated.emit(
+                FrameAnnotator.annotate(
+                    image_bgr=image,
+                    pose=pose,
+                    face=face,
+                    is_calibrating=True,
+                    calib_current=count,
                     calib_total=target,
                     calib_plausible=False,
                     calib_feedback=prompt,
@@ -424,28 +527,43 @@ class VisionTrackerWorker(QtCore.QThread):
             )
             return
 
+        is_valid, _reason, sample = self.calibration_engine.validate_sample_plausibility(
+            pose, face
+        )
+        if not is_valid:
+            self._calib_invalid_streak += 1
+            if self._calib_invalid_streak >= 3:
+                self.calibration_engine.reset()
+            prompt = self._format_calibration_guidance(
+                face=face,
+                neck_ratio=sample.neck_ratio,
+                theta_sh_deg=sample.theta_sh_deg,
+            )
+            count = len(self.calibration_engine.samples)
+            self.calibration_progress.emit(count, target, False, prompt)
+            self.frame_annotated.emit(
+                FrameAnnotator.annotate(
+                    image_bgr=image,
+                    pose=pose,
+                    face=face,
+                    is_calibrating=True,
+                    calib_current=count,
+                    calib_total=target,
+                    calib_plausible=False,
+                    calib_feedback=prompt,
+                )
+            )
+            return
+
+        self._calib_invalid_streak = 0
         self.calibration_engine.add_sample(pose, face)
         count = len(self.calibration_engine.samples)
-        prompt = "Pertahankan posisi tegak lurus..."
-
-        self.calibration_progress.emit(count, target, True, prompt)
-        self.frame_annotated.emit(
-            FrameAnnotator.annotate(
-                image_bgr=image,
-                pose=pose,
-                face=face,
-                is_calibrating=True,
-                calib_current=count,
-                calib_total=target,
-                calib_plausible=True,
-                calib_feedback=prompt,
-            )
-        )
 
         if count >= target:
             try:
                 _ref, rec = self.calibration_engine.finalize()
                 self._manual_calibrating = False
+                self._calib_invalid_streak = 0
                 profile_id = self.db_worker.db_manager.save_calibration_profile(rec)
                 updated_rec = CalibrationProfileRecord(
                     profile_id=profile_id,
@@ -466,11 +584,84 @@ class VisionTrackerWorker(QtCore.QThread):
                 self.set_active_profile(updated_rec)
                 if self.orchestrator is not None:
                     self.orchestrator.operating_mode = OperatingMode.ACTIVE_MONITORING
+                done_msg = "Kalibrasi berhasil! Referensi postur disimpan."
+                self.calibration_progress.emit(target, target, True, done_msg)
+                self.frame_annotated.emit(
+                    FrameAnnotator.annotate(
+                        image_bgr=image,
+                        pose=pose,
+                        face=face,
+                        is_calibrating=True,
+                        calib_current=target,
+                        calib_total=target,
+                        calib_plausible=True,
+                        calib_feedback=done_msg,
+                    )
+                )
                 self.calibration_completed.emit(updated_rec)
                 self._emit_current_state()
+                return
             except Exception as e:
+                noise_info = self.calibration_engine.last_failed_noise_info
                 self.calibration_engine.reset()
-                self.calibration_progress.emit(0, target, False, str(e))
+                self._calib_invalid_streak = 0
+                if noise_info is not None:
+                    metric_key, four_sigma, limit_val = noise_info
+                    metric_labels = {
+                        "fhp": "Jarak wajah/FHP",
+                        "neck": "Tinggi leher/telinga",
+                        "slump": "Stabilitas bahu",
+                        "pitch": "Anggukan kepala",
+                        "tilt": "Kemiringan bahu/kepala",
+                    }
+                    m_label = metric_labels.get(metric_key, metric_key)
+                    retry_msg = (
+                        f"{e} (jitter {m_label}: {four_sigma:.3f} > batas {limit_val:.3f}) — "
+                        "Kurangi cahaya silau di belakang / tahan diam 3 detik."
+                    )
+                else:
+                    retry_msg = f"{e} — Tahan posisi diam tanpa bergerak selama 3 detik."
+                self._calib_error_cooldown_ticks = 8
+                self._calib_last_error_msg = retry_msg
+                self.calibration_progress.emit(0, target, False, retry_msg)
+                self.frame_annotated.emit(
+                    FrameAnnotator.annotate(
+                        image_bgr=image,
+                        pose=pose,
+                        face=face,
+                        is_calibrating=True,
+                        calib_current=0,
+                        calib_total=target,
+                        calib_plausible=False,
+                        calib_feedback=retry_msg,
+                    )
+                )
+                return
+
+        remaining_s = max(0.0, (target - count) / 5.0)
+        prompt = f"Posisi pas! Tahan diam & tatap titik tengah ({remaining_s:.1f} dtk)..."
+        self.calibration_progress.emit(count, target, True, prompt)
+        self.frame_annotated.emit(
+            FrameAnnotator.annotate(
+                image_bgr=image,
+                pose=pose,
+                face=face,
+                is_calibrating=True,
+                calib_current=count,
+                calib_total=target,
+                calib_plausible=True,
+                calib_feedback=prompt,
+            )
+        )
+
+    def _emit_environment_alerts(self, low_light: bool, extreme_close: bool) -> None:
+        """Emit environment alerts only when low-light or extreme proximity state changes."""
+        state = (low_light, extreme_close)
+        if state == self._last_env_alerts:
+            return
+        self._last_env_alerts = state
+        msg = LOW_LIGHT_WARNING_MESSAGE if low_light else ""
+        self.environment_alerts_changed.emit(low_light, extreme_close, msg)
 
     def _emit_current_state(self) -> None:
         """Emit state change with current orchestrator snapshot."""

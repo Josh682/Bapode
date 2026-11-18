@@ -106,11 +106,15 @@ class CalibrationEngine:
         target_samples: int = 15,
         limits: PlausibilityGateLimits | None = None,
         tau_enter_defaults: dict[str, float] | None = None,
+        mad_rejection_factor: float = 0.80,
     ) -> None:
         self.target_samples = target_samples
         self.limits = limits or PlausibilityGateLimits()
         self.tau_enter_defaults = tau_enter_defaults or DEFAULT_TAU_ENTER
+        self.mad_rejection_factor = mad_rejection_factor
         self.samples: list[RawCalibrationSample] = []
+        self.last_sigmas: dict[str, float] = {}
+        self.last_failed_noise_info: tuple[str, float, float] | None = None
 
     def reset(self) -> None:
         """Clear collected calibration samples."""
@@ -310,11 +314,24 @@ class CalibrationEngine:
         }
 
         # 5. Check Light Quality & Stability Gate:
-        # If 4 * sigma_i_0 > 0.80 * tau_default_enter, reject!
+        # If 4 * sigma_i_0 > mad_rejection_factor * tau_default_enter, reject!
+        self.last_sigmas = dict(sigmas)
+        self.last_failed_noise_info = None
+        worst_ratio = 0.0
+        worst_info: tuple[str, float, float] | None = None
         for metric_name, sigma_val in sigmas.items():
             tau_enter = defaults.get(metric_name, DEFAULT_TAU_ENTER[metric_name])
-            if 4.0 * sigma_val > 0.80 * tau_enter:
-                raise CalibrationError(RECALIBRATION_REASON_NOISY)
+            limit_val = self.mad_rejection_factor * tau_enter
+            four_sigma = 4.0 * sigma_val
+            if limit_val > 0.0 and four_sigma > limit_val:
+                ratio = four_sigma / limit_val
+                if ratio > worst_ratio:
+                    worst_ratio = ratio
+                    worst_info = (metric_name, four_sigma, limit_val)
+
+        if worst_info is not None:
+            self.last_failed_noise_info = worst_info
+            raise CalibrationError(RECALIBRATION_REASON_NOISY)
 
         profile = CalibrationProfileRecord(
             profile_id=None,
